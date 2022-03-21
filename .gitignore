@@ -1,0 +1,8 @@
+/logs
+/best_model
+/.ipynb_checkpoints
+/__pycache__
+/prediction
+/results
+._*
+*.pkl
