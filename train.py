@@ -122,7 +122,7 @@ def train(args):
     # 사용한 option 외에도 다양한 option들이 있습니다.
     # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
     training_args = TrainingArguments(
-        output_dir='./results',           # output directory
+        output_dir=args.save_dir,           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
         num_train_epochs=20,      # total number of training epochs
@@ -152,7 +152,7 @@ def train(args):
 
     # train model
     trainer.train()
-    model.save_pretrained('./best_model')
+    model.save_pretrained(args.best_save_dir)
     wandb.finish()
     
 def main(args):
@@ -174,6 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
+    parser.add_argument('--best_save_dir', type=str, default="./best_model")
 
     args = parser.parse_args()
     main(args)
