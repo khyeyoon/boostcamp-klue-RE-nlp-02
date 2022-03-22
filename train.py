@@ -77,10 +77,10 @@ def seed_everything(seed=42):
     np.random.seed(seed)
     random.seed(seed)
 
-def train():
+def train(args):
     # load model and tokenizer
     # MODEL_NAME = "bert-base-uncased"
-    MODEL_NAME = "klue/bert-base"
+    MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
     # gpt3-kor-small_based_on_gpt2
@@ -155,11 +155,25 @@ def train():
     model.save_pretrained('./best_model')
     wandb.finish()
     
-def main():
-    train()
+def main(args):
+    seed_everything(args.seed)
+    train(args)
 
 if __name__ == '__main__':
     # wandb.login()
-    seed_everything()
     wandb.init(project="test-project", entity="salt-bread")
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, default="klue/bert-base")
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--valid_batch_size', type=int, default=64)
+    parser.add_argument('--optimizer', type=str, default=None)
+    parser.add_argument('--lr', type=float, default=5e-5)
+    parser.add_argument('--val_ratio', type=float, default=0.1)
+    parser.add_argument('--criterion', type=str, default=None)
+    parser.add_argument('--save_dir', type=str, default="./results")
+
+    args = parser.parse_args()
+    main(args)
