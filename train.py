@@ -6,7 +6,9 @@ import sklearn
 import numpy as np
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments, RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification, BertTokenizer
+# from transformers import BertTokenizerFast, GPT2LMHeadModel
 from load_data import *
+import wandb
 
 
 def klue_re_micro_f1(preds, labels):
@@ -52,9 +54,9 @@ def compute_metrics(pred):
     acc = accuracy_score(labels, preds) # 리더보드 평가에는 포함되지 않습니다.
 
     return {
-            'micro f1 score': f1,
-            'auprc' : auprc,
-            'accuracy': acc,
+        'micro f1 score': f1,
+        'auprc' : auprc,
+        'accuracy': acc,
     }
 
 def label_to_num(label):
@@ -71,6 +73,12 @@ def train():
     # MODEL_NAME = "bert-base-uncased"
     MODEL_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+
+    # gpt3-kor-small_based_on_gpt2
+    # tokenizer = BertTokenizerFast.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
+    # input_ids = tokenizer.encode("text to tokenize")[1:]  # remove cls token
+            
+    # MODEL_NAME = GPT2LMHeadModel.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
 
     # load dataset
     train_dataset = load_data("../dataset/train/train.csv")
@@ -105,7 +113,7 @@ def train():
         output_dir='./results',           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
-                num_train_epochs=20,      # total number of training epochs
+        num_train_epochs=20,      # total number of training epochs
         learning_rate=5e-5,               # learning_rate
         per_device_train_batch_size=16,   # batch size per device during training
         per_device_eval_batch_size=16,    # batch size for evaluation
@@ -118,7 +126,9 @@ def train():
                                           # `steps`: Evaluate every `eval_steps`.
                                           # `epoch`: Evaluate every end of epoch.
         eval_steps = 500,                 # evaluation step.
-        load_best_model_at_end = True 
+        load_best_model_at_end = True, 
+        report_to="wandb",  # enable logging to W&B
+        run_name="bert-base-high-lr"  # name of the W&B run (optional)
     )
     trainer = Trainer(
         model=model,                      # the instantiated 🤗 Transformers model to be trained
@@ -131,9 +141,12 @@ def train():
     # train model
     trainer.train()
     model.save_pretrained('./best_model')
+    wandb.finish()
     
 def main():
     train()
 
 if __name__ == '__main__':
+    # wandb.login()
+    wandb.init(project="test-project", entity="salt-bread")
     main()
