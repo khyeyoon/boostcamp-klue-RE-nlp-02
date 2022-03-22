@@ -68,6 +68,15 @@ def label_to_num(label):
     
     return num_label
 
+def seed_everything(seed=42):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+
 def train():
     # load model and tokenizer
     # MODEL_NAME = "bert-base-uncased"
@@ -81,18 +90,21 @@ def train():
     # MODEL_NAME = GPT2LMHeadModel.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
 
     # load dataset
-    train_dataset = load_data("../dataset/train/train.csv")
+    dataset = load_data("../dataset/train/train.csv")
     # dev_dataset = load_data("../dataset/train/dev.csv") # validation용 데이터는 따로 만드셔야 합니다.
+        
+    train_dataset, valid_dataset = train_test_split(dataset, test_size=0.1, shuffle=True, stratify=dataset['label'], random_state=42)
 
     train_label = label_to_num(train_dataset['label'].values)
-    # dev_label = label_to_num(dev_dataset['label'].values)
+    valid_label = label_to_num(valid_dataset['label'].values)
 
     # tokenizing dataset
     tokenized_train = tokenized_dataset(train_dataset, tokenizer)
-    # tokenized_dev = tokenized_dataset(dev_dataset, tokenizer)
+    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer)
 
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
+    RE_valid_dataset = RE_Dataset(tokenized_valid, valid_label)
     # RE_dev_dataset = RE_Dataset(tokenized_dev, dev_label)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -134,7 +146,7 @@ def train():
         model=model,                      # the instantiated 🤗 Transformers model to be trained
         args=training_args,               # training arguments, defined above
         train_dataset=RE_train_dataset,   # training dataset
-        eval_dataset=RE_train_dataset,    # evaluation dataset
+        eval_dataset=RE_valid_dataset,    # evaluation dataset
         compute_metrics=compute_metrics   # define metrics function
     )
 
@@ -148,5 +160,6 @@ def main():
 
 if __name__ == '__main__':
     # wandb.login()
+    seed_everything()
     wandb.init(project="test-project", entity="salt-bread")
     main()
