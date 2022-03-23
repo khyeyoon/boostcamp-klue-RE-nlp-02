@@ -99,8 +99,8 @@ class Preprocessing_dataset:
         object_entity = []
         sentences = []
         for sentence, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
-            sub=String2dict(sub)
-            obj=String2dict(obj)
+            sub=self.String2dict(sub)
+            obj=self.String2dict(obj)
 
             sentence=sentence[:int(sub['start_idx'])]+"S"*len(sub['word'])+sentence[int(sub['end_idx'])+1:]
             sub_token="["+sub['type']+"]"+sub['word']+"[/"+sub['type']+"]"
