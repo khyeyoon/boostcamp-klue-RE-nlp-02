@@ -71,7 +71,7 @@ def label_to_num(label):
     
     return num_label
 
-def seed_everything(seed=42):
+def seed_everything(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if use multi-GPU
@@ -86,6 +86,10 @@ def train(args):
     MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
+    # add special token
+    added_token_num = tokenizer.add_special_tokens({"additional_special_tokens":['[sub_ent]','[/sub_ent]','[obj_ent]','[/obj_ent]']})
+    tokenizer.save_pretrained(args.tokenizer_dir)
+
     # gpt3-kor-small_based_on_gpt2
     # tokenizer = BertTokenizerFast.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
     # input_ids = tokenizer.encode("text to tokenize")[1:]  # remove cls token
@@ -96,7 +100,7 @@ def train(args):
     dataset = load_data("../dataset/train/train.csv")
     # dev_dataset = load_data("../dataset/train/dev.csv") # validation용 데이터는 따로 만드셔야 합니다.
         
-    train_dataset, valid_dataset = train_test_split(dataset, test_size=0.1, shuffle=True, stratify=dataset['label'], random_state=42)
+    train_dataset, valid_dataset = train_test_split(dataset, test_size=args.val_ratio, shuffle=True, stratify=dataset['label'], random_state=args.seed)
 
     train_label = label_to_num(train_dataset['label'].values)
     valid_label = label_to_num(valid_dataset['label'].values)
@@ -117,7 +121,9 @@ def train(args):
     model_config =    AutoConfig.from_pretrained(MODEL_NAME)
     model_config.num_labels = 30
 
+    #model load & vocab update
     model =   AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
+    model.resize_token_embeddings(tokenizer.vocab_size + added_token_num)
     print(model.config)
     model.parameters
     model.to(device)
@@ -128,10 +134,10 @@ def train(args):
         output_dir=args.save_dir,           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
-        num_train_epochs=20,      # total number of training epochs
+        num_train_epochs=args.epochs,      # total number of training epochs
         learning_rate=5e-5,               # learning_rate
-        per_device_train_batch_size=16,   # batch size per device during training
-        per_device_eval_batch_size=16,    # batch size for evaluation
+        per_device_train_batch_size=args.batch_size,   # batch size per device during training
+        per_device_eval_batch_size=args.valid_batch_size,    # batch size for evaluation
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
         weight_decay=0.01,                # strength of weight decay
         logging_dir='./logs',             # directory for storing logs
@@ -145,6 +151,7 @@ def train(args):
         report_to="wandb",  # enable logging to W&B
         run_name="bert-base-high-lr"  # name of the W&B run (optional)
     )
+
     trainer = Trainer(
         model=model,                      # the instantiated 🤗 Transformers model to be trained
         args=training_args,               # training arguments, defined above
@@ -160,16 +167,16 @@ def train(args):
     
 def main(args):
     seed_everything(args.seed)
+    wandb.init(project="salt_v1", entity="salt-bread", name=args.wandb_name)
     train(args)
 
 if __name__ == '__main__':
     # wandb.login()
-    wandb.init(project="test-project", entity="salt-bread")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="klue/bert-base")
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default=None)
@@ -178,6 +185,8 @@ if __name__ == '__main__':
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--best_save_dir', type=str, default="./best_model")
+    parser.add_argument('--tokenizer_dir', type=str, default='./tokenizer/')
+    parser.add_argument('--wandb_name', type=str, default='mj')
 
     args = parser.parse_args()
     main(args)

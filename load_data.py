@@ -2,7 +2,7 @@ import pickle as pickle
 import os
 import pandas as pd
 import torch
-
+import re
 
 class RE_Dataset(torch.utils.data.Dataset):
     """ Dataset 구성을 위한 class."""
@@ -20,15 +20,19 @@ class RE_Dataset(torch.utils.data.Dataset):
 
 def preprocessing_dataset(dataset):
     """ 처음 불러온 csv 파일을 원하는 형태의 DataFrame으로 변경 시켜줍니다."""
+    pre_sentence = []
     subject_entity = []
     object_entity = []
-    for i,j in zip(dataset['subject_entity'], dataset['object_entity']):
-        i = i[1:-1].split(',')[0].split(':')[1]
-        j = j[1:-1].split(',')[0].split(':')[1]
+    for s,i,j in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
+        i = i[1:-1].split(',')[0].split(':')[1][2:-1]
+        j = j[1:-1].split(',')[0].split(':')[1][2:-1]
+        s = re.sub(i, '[sub_ent]'+i+'[/sub_ent]', s)
+        s = re.sub(j, '[obj_ent]'+j+'[/obj_ent]', s)
 
         subject_entity.append(i)
         object_entity.append(j)
-    out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':dataset['sentence'],'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+        pre_sentence.append(s)
+    out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':pre_sentence,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
     return out_dataset
 
 def load_data(dataset_dir):
