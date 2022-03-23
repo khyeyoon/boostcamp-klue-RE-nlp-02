@@ -8,4 +8,4 @@
 ._*
 /wandb
 shell.sh
-nohup.out
+*.out

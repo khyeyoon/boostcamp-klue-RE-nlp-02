@@ -12,6 +12,8 @@ from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassifi
 from load_data import *
 import argparse
 import wandb
+import datetime
+from pytz import timezone
 
 
 def klue_re_micro_f1(preds, labels):
@@ -96,7 +98,7 @@ def train(args):
     dataset = load_data("../dataset/train/train.csv")
     # dev_dataset = load_data("../dataset/train/dev.csv") # validation용 데이터는 따로 만드셔야 합니다.
         
-    train_dataset, valid_dataset = train_test_split(dataset, test_size=0.1, shuffle=True, stratify=dataset['label'], random_state=42)
+    train_dataset, valid_dataset = train_test_split(dataset, test_size=args.val_ratio, shuffle=True, stratify=dataset['label'], random_state=args.seed)
 
     train_label = label_to_num(train_dataset['label'].values)
     valid_label = label_to_num(valid_dataset['label'].values)
@@ -122,14 +124,19 @@ def train(args):
     model.parameters
     model.to(device)
     
+    # calculate time
+    KST = timezone('Asia/Seoul')
+    ti = str(datetime.datetime.now(KST)).split()
+    cur_time = ti[0][2:] + '_' + ti[1][:8].replace(':', '_')
+
     # 사용한 option 외에도 다양한 option들이 있습니다.
     # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
     training_args = TrainingArguments(
-        output_dir=args.save_dir,           # output directory
+        output_dir=args.save_dir + '/' + cur_time,           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
-        num_train_epochs=20,      # total number of training epochs
-        learning_rate=5e-5,               # learning_rate
+        num_train_epochs=args.epochs,      # total number of training epochs
+        learning_rate=args.lr,               # learning_rate
         per_device_train_batch_size=16,   # batch size per device during training
         per_device_eval_batch_size=16,    # batch size for evaluation
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
@@ -155,7 +162,7 @@ def train(args):
 
     # train model
     trainer.train()
-    model.save_pretrained(args.best_save_dir)
+    model.save_pretrained(args.best_save_dir + '/' + cur_time)
     wandb.finish()
     
 def main(args):
@@ -164,7 +171,7 @@ def main(args):
 
 if __name__ == '__main__':
     # wandb.login()
-    wandb.init(project="test-project", entity="salt-bread")
+    wandb.init(project="salt_v1", entity="salt-bread")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="klue/bert-base")
