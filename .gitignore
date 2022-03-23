@@ -6,3 +6,5 @@
 /results
 ._*
 /wandb
+shell.sh
+nohup.out
