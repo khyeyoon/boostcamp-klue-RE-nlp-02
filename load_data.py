@@ -1,7 +1,7 @@
-import pickle as pickle
 import os
-import pandas as pd
 import torch
+import pandas as pd
+import pickle as pickle
 
 
 class RE_Dataset(torch.utils.data.Dataset):

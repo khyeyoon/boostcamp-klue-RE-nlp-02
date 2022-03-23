@@ -1,15 +1,16 @@
 import os
-import pickle as pickle
-import pandas as pd
 import torch
-import sklearn
 import random
+import sklearn
 import numpy as np
+import pandas as pd
+import pickle as pickle
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments, RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification, BertTokenizer
 # from transformers import BertTokenizerFast, GPT2LMHeadModel
 from load_data import *
+
 import argparse
 import wandb
 import datetime
@@ -137,8 +138,8 @@ def train(args):
         save_steps=500,                   # model saving step.
         num_train_epochs=args.epochs,      # total number of training epochs
         learning_rate=args.lr,               # learning_rate
-        per_device_train_batch_size=16,   # batch size per device during training
-        per_device_eval_batch_size=16,    # batch size for evaluation
+        per_device_train_batch_size=args.batch_size,   # batch size per device during training
+        per_device_eval_batch_size=args.valid_batch_size,    # batch size for evaluation
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
         weight_decay=0.01,                # strength of weight decay
         logging_dir='./logs',             # directory for storing logs
@@ -167,11 +168,11 @@ def train(args):
     
 def main(args):
     seed_everything(args.seed)
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name)
     train(args)
 
 if __name__ == '__main__':
     # wandb.login()
-    wandb.init(project="salt_v1", entity="salt-bread")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="klue/bert-base")
@@ -185,6 +186,8 @@ if __name__ == '__main__':
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--best_save_dir', type=str, default="./best_model")
+    parser.add_argument('--report_name', type=str)
+    parser.add_argument('--project_name', type=str, default="salt_v1")
 
     args = parser.parse_args()
     main(args)
