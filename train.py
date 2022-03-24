@@ -13,8 +13,6 @@ from load_data import *
 
 import argparse
 import wandb
-import datetime
-from pytz import timezone
 
 
 def klue_re_micro_f1(preds, labels):
@@ -125,15 +123,10 @@ def train(args):
     model.parameters
     model.to(device)
     
-    # calculate time
-    KST = timezone('Asia/Seoul')
-    ti = str(datetime.datetime.now(KST)).split()
-    cur_time = ti[0][2:] + '_' + ti[1][:8].replace(':', '_')
-
     # 사용한 option 외에도 다양한 option들이 있습니다.
     # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
     training_args = TrainingArguments(
-        output_dir=args.save_dir + '/' + cur_time,           # output directory
+        output_dir=args.save_dir,           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
         num_train_epochs=args.epochs,      # total number of training epochs
@@ -151,7 +144,6 @@ def train(args):
         eval_steps = 500,                 # evaluation step.
         load_best_model_at_end = True, 
         report_to="wandb",  # enable logging to W&B
-        run_name="bert-base-high-lr"  # name of the W&B run (optional)
     )
     trainer = Trainer(
         model=model,                      # the instantiated 🤗 Transformers model to be trained
@@ -163,7 +155,9 @@ def train(args):
 
     # train model
     trainer.train()
-    model.save_pretrained(args.best_save_dir + '/' + cur_time)
+    best_save_path = args.best_save_dir
+    model.save_pretrained(best_save_path)
+    tokenizer.save_pretrained(best_save_path)
     wandb.finish()
     
 def main(args):
