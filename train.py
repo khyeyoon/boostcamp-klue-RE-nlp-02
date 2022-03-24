@@ -269,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
+    parser.add_argument('--token_type', type=str, default="origin")
 
     args = parser.parse_args()
     main(args)
