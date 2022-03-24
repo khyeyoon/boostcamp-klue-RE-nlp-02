@@ -263,6 +263,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
+    parser.add_argument('--token_type', type=str, default="origin")
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
