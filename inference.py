@@ -1,3 +1,5 @@
+import json
+from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
 from load_data import *
@@ -65,12 +67,17 @@ def main(args):
     """
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # load tokenizer
-    Tokenizer_NAME = "klue/bert-base"
+    config_path = os.path.join(args.model_dir, "config.json")
+    with open(config_path, 'r') as json_file:
+        json_data = json.load(json_file)
+        Tokenizer_NAME = json_data["_name_or_path"]
+
+    # Tokenizer_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
     ## load my model
     MODEL_NAME = args.model_dir # model dir.
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
     model.parameters
     model.to(device)
 
@@ -88,7 +95,7 @@ def main(args):
     # 아래 directory와 columns의 형태는 지켜주시기 바랍니다.
     output = pd.DataFrame({'id':test_id,'pred_label':pred_answer,'probs':output_prob,})
 
-    output.to_csv('./prediction/submission.csv', index=False) # 최종적으로 완성된 예측한 라벨 csv 파일 형태로 저장.
+    output.to_csv('./prediction/' + args.submission_name + ".csv", index=False) # 최종적으로 완성된 예측한 라벨 csv 파일 형태로 저장.
     #### 필수!! ##############################################
     print('---- Finish! ----')
 if __name__ == '__main__':
@@ -96,6 +103,7 @@ if __name__ == '__main__':
     
     # model dir
     parser.add_argument('--model_dir', type=str, default="./best_model")
+    parser.add_argument('--submission_name', type=str, default="submission")
     args = parser.parse_args()
     print(args)
     main(args)

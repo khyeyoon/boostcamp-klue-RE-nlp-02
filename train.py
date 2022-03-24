@@ -1,13 +1,17 @@
-import pickle as pickle
 import os
-import pandas as pd
 import torch
+import random
 import sklearn
 import numpy as np
+import pandas as pd
+import pickle as pickle
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments, RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification, BertTokenizer
 # from transformers import BertTokenizerFast, GPT2LMHeadModel
 from load_data import *
+
+import argparse
 import wandb
 
 
@@ -93,7 +97,7 @@ def train(args):
     dataset = load_data("../dataset/train/train.csv")
     # dev_dataset = load_data("../dataset/train/dev.csv") # validation용 데이터는 따로 만드셔야 합니다.
         
-    train_dataset, valid_dataset = train_test_split(dataset, test_size=0.1, shuffle=True, stratify=dataset['label'], random_state=42)
+    train_dataset, valid_dataset = train_test_split(dataset, test_size=args.val_ratio, shuffle=True, stratify=dataset['label'], random_state=args.seed)
 
     train_label = label_to_num(train_dataset['label'].values)
     valid_label = label_to_num(valid_dataset['label'].values)
@@ -122,13 +126,13 @@ def train(args):
     # 사용한 option 외에도 다양한 option들이 있습니다.
     # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
     training_args = TrainingArguments(
-        output_dir='./results',           # output directory
+        output_dir=args.save_dir,           # output directory
         save_total_limit=5,               # number of total save model.
         save_steps=500,                   # model saving step.
-        num_train_epochs=20,      # total number of training epochs
-        learning_rate=5e-5,               # learning_rate
-        per_device_train_batch_size=16,   # batch size per device during training
-        per_device_eval_batch_size=16,    # batch size for evaluation
+        num_train_epochs=args.epochs,      # total number of training epochs
+        learning_rate=args.lr,               # learning_rate
+        per_device_train_batch_size=args.batch_size,   # batch size per device during training
+        per_device_eval_batch_size=args.valid_batch_size,    # batch size for evaluation
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
         weight_decay=0.01,                # strength of weight decay
         logging_dir='./logs',             # directory for storing logs
@@ -140,7 +144,6 @@ def train(args):
         eval_steps = 500,                 # evaluation step.
         load_best_model_at_end = True, 
         report_to="wandb",  # enable logging to W&B
-        run_name="bert-base-high-lr"  # name of the W&B run (optional)
     )
     trainer = Trainer(
         model=model,                      # the instantiated 🤗 Transformers model to be trained
@@ -152,16 +155,18 @@ def train(args):
 
     # train model
     trainer.train()
-    model.save_pretrained('./best_model')
+    best_save_path = args.best_save_dir
+    model.save_pretrained(best_save_path)
+    tokenizer.save_pretrained(best_save_path)
     wandb.finish()
     
 def main(args):
     seed_everything(args.seed)
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name)
     train(args)
 
 if __name__ == '__main__':
     # wandb.login()
-    wandb.init(project="test-project", entity="salt-bread")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="klue/bert-base")
@@ -174,6 +179,9 @@ if __name__ == '__main__':
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
+    parser.add_argument('--best_save_dir', type=str, default="./best_model")
+    parser.add_argument('--report_name', type=str)
+    parser.add_argument('--project_name', type=str, default="salt_v1")
 
     args = parser.parse_args()
     main(args)

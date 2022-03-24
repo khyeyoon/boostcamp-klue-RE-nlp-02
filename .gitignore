@@ -1,5 +1,6 @@
 /logs
-/best_model
+/best*
+/save*
 /.ipynb_checkpoints
 /__pycache__
 /prediction
@@ -7,5 +8,6 @@
 /bests
 /wandb
 /tokenizer
-nohup.out
 ._*
+shell.sh
+*.out
