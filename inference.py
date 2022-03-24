@@ -1,4 +1,3 @@
-import json
 from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
@@ -67,11 +66,7 @@ def main(args):
     """
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # load tokenizer
-    config_path = os.path.join(args.model_dir, "config.json")
-    with open(config_path, 'r') as json_file:
-        json_data = json.load(json_file)
-        Tokenizer_NAME = json_data["_name_or_path"]
-
+    Tokenizer_NAME = os.path.join(args.model_dir, "..")
     # Tokenizer_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
@@ -102,7 +97,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # model dir
-    parser.add_argument('--model_dir', type=str, default="./best_model")
+    parser.add_argument('--model_dir', type=str, default="./results/best_f1")
     parser.add_argument('--submission_name', type=str, default="submission")
     args = parser.parse_args()
     print(args)

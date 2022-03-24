@@ -98,10 +98,17 @@ def train(args):
     # load model and tokenizer
     MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    special_tokens={
+        'origin':[],
+        'entity':["[ENT]", "[/ENT]"],
+        'type_entity':["[ORG]","[/ORG]","[PER]","[/PER]","[POH]","[/POH]","[LOC]","[/LOC]","[DAT]","[/DAT]","[NOH]","[/NOH]"],
+        'sub/obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
+    }
+    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type)})    
 
     # load dataset
-    dataset = load_data("../dataset/train/train.csv")
-        
+    dataset = load_data("../dataset/train/train.csv", token_type=args.token_type)
+
     train_dataset, valid_dataset = train_test_split(dataset, test_size=args.val_ratio, shuffle=True, stratify=dataset['label'], random_state=args.seed)
 
     train_label = label_to_num(train_dataset['label'].values)
@@ -123,6 +130,7 @@ def train(args):
     model_config.num_labels = 30
 
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
+    model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
     print(model.config)
     model.to(device)
     
@@ -140,6 +148,11 @@ def train(args):
         "lr":args.lr,
         "val_ratio":args.val_ratio,
     })
+
+    save_path = args.save_dir
+
+    best_eval_loss = 1e9
+    best_eval_f1 = 0
 
     for epoch in range(args.epochs):
         total_loss, total_idx = 0, 0
@@ -184,10 +197,13 @@ def train(args):
 
             loss.backward()
             optim.step()
-        print("--------------------------------------------------------------------------")
-        print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
+        
+        model.save_pretrained(os.path.join(save_path, f"EPOCH-{epoch + 1}"))
+
         with torch.no_grad():
-            model.eval()        
+            model.eval()
+            print("--------------------------------------------------------------------------")
+            print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
             for batch in tqdm(valid_loader):
                 eval_total_idx += 1
 
@@ -209,7 +225,14 @@ def train(args):
                 eval_average_f1 = eval_total_f1/eval_total_idx
                 eval_average_acc = eval_total_acc/eval_total_idx
 
-                
+                if eval_average_loss < best_eval_loss:
+                    model.save_pretrained(os.path.join(save_path, "best_loss"))
+                    best_eval_loss = eval_average_loss
+
+                if eval_average_f1 > best_eval_f1:
+                    model.save_pretrained(os.path.join(save_path, "best_f1"))
+                    best_eval_f1 = eval_average_f1
+
                 wandb.log({
                     "eval_loss":eval_average_loss,
                     "eval_f1":eval_average_f1,
@@ -221,9 +244,7 @@ def train(args):
 
         print("--------------------------------------------------------------------------")
 
-    best_save_path = args.best_save_dir
-    model.save_pretrained(best_save_path)
-    tokenizer.save_pretrained(best_save_path)
+    tokenizer.save_pretrained(save_path)
     wandb.finish()
     
 def main(args):
@@ -246,7 +267,6 @@ if __name__ == '__main__':
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
-    parser.add_argument('--best_save_dir', type=str, default="./best_model")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v1")
 

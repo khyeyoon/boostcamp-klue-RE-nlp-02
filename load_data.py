@@ -124,8 +124,8 @@ class Preprocessing_dataset:
         for s,i,j in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             i = i[1:-1].split(',')[0].split(':')[1][2:-1]
             j = j[1:-1].split(',')[0].split(':')[1][2:-1]
-            s = re.sub(i, '[sub_ent]'+i+'[/sub_ent]', s)
-            s = re.sub(j, '[obj_ent]'+j+'[/obj_ent]', s)
+            s = re.sub(i, '[SUB_ENT]'+i+'[/SUB_ENT]', s)
+            s = re.sub(j, '[OBJ_ENT]'+j+'[/OBJ_ENT]', s)
 
             subject_entity.append(i)
             object_entity.append(j)
