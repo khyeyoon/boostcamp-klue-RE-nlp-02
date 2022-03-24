@@ -1,15 +1,16 @@
 import os
-import pickle as pickle
-import pandas as pd
 import torch
-import sklearn
 import random
+import sklearn
 import numpy as np
+import pandas as pd
+import pickle as pickle
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments, RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification, BertTokenizer
 # from transformers import BertTokenizerFast, GPT2LMHeadModel
 from load_data import *
+
 import argparse
 import wandb
 
@@ -87,7 +88,7 @@ def train(args):
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
     # add special token
-    added_token_num = tokenizer.add_special_tokens({"additional_special_tokens":['[sub_ent]','[/sub_ent]','[obj_ent]','[/obj_ent]']})
+    added_token_num = tokenizer.add_special_tokens({"additional_special_tokens":['[SUB_ENT]','[/SU_ENT]','[OBJ_ENT]','[/OBJ_ENT]']})
     tokenizer.save_pretrained(args.tokenizer_dir)
 
     # gpt3-kor-small_based_on_gpt2
@@ -135,7 +136,7 @@ def train(args):
         save_total_limit=args.save_total_limit,               # number of total save model.
         save_steps=500,                   # model saving step.
         num_train_epochs=args.epochs,      # total number of training epochs
-        learning_rate=5e-5,               # learning_rate
+        learning_rate=args.lr,               # learning_rate
         per_device_train_batch_size=args.batch_size,   # batch size per device during training
         per_device_eval_batch_size=args.valid_batch_size,    # batch size for evaluation
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
@@ -149,7 +150,6 @@ def train(args):
         eval_steps = 500,                 # evaluation step.
         load_best_model_at_end = True, 
         report_to="wandb",  # enable logging to W&B
-        run_name="bert-base-high-lr"  # name of the W&B run (optional)
     )
 
     trainer = Trainer(
@@ -162,12 +162,14 @@ def train(args):
 
     # train model
     trainer.train()
-    model.save_pretrained(args.best_save_dir)
+    best_save_path = args.best_save_dir
+    model.save_pretrained(best_save_path)
+    tokenizer.save_pretrained(best_save_path)
     wandb.finish()
     
 def main(args):
     seed_everything(args.seed)
-    wandb.init(project="salt_v1", entity="salt-bread", name=args.wandb_name)
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name)
     train(args)
 
 if __name__ == '__main__':
@@ -186,9 +188,10 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--best_save_dir', type=str, default="./best_model")
     parser.add_argument('--tokenizer_dir', type=str, default='./tokenizer/')
-    parser.add_argument('--wandb_name', type=str, default='mj')
     parser.add_argument('--max_length', type=int, default=256)
     parser.add_argument('--save_total_limit', type=int, default=5)
+    parser.add_argument('--report_name', type=str, default='mj')
+    parser.add_argument('--project_name', type=str, default="salt_v1")
 
     args = parser.parse_args()
     main(args)

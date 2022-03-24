@@ -1,8 +1,13 @@
 /logs
-/best_model
+/best*
+/save*
 /.ipynb_checkpoints
 /__pycache__
 /prediction
 /results
-._*
+/bests
 /wandb
+/tokenizer
+._*
+shell.sh
+*.out
