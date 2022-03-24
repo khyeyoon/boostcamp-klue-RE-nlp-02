@@ -106,8 +106,8 @@ def train(args):
     valid_label = label_to_num(valid_dataset['label'].values)
 
     # tokenizing dataset
-    tokenized_train = tokenized_dataset(train_dataset, tokenizer)
-    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer)
+    tokenized_train = tokenized_dataset(train_dataset, tokenizer, args.max_length)
+    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer, args.max_length)
 
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
@@ -118,7 +118,7 @@ def train(args):
 
     print(device)
     # setting model hyperparameter
-    model_config =    AutoConfig.from_pretrained(MODEL_NAME)
+    model_config = AutoConfig.from_pretrained(MODEL_NAME)
     model_config.num_labels = 30
 
     #model load & vocab update
@@ -132,7 +132,7 @@ def train(args):
     # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
     training_args = TrainingArguments(
         output_dir=args.save_dir,           # output directory
-        save_total_limit=5,               # number of total save model.
+        save_total_limit=args.save_total_limit,               # number of total save model.
         save_steps=500,                   # model saving step.
         num_train_epochs=args.epochs,      # total number of training epochs
         learning_rate=5e-5,               # learning_rate
@@ -187,6 +187,8 @@ if __name__ == '__main__':
     parser.add_argument('--best_save_dir', type=str, default="./best_model")
     parser.add_argument('--tokenizer_dir', type=str, default='./tokenizer/')
     parser.add_argument('--wandb_name', type=str, default='mj')
+    parser.add_argument('--max_length', type=int, default=256)
+    parser.add_argument('--save_total_limit', type=int, default=5)
 
     args = parser.parse_args()
     main(args)
