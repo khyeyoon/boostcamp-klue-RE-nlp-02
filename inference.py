@@ -1,3 +1,4 @@
+import json
 from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
@@ -49,12 +50,12 @@ def num_to_label(label):
     
     return origin_label
 
-def load_test_dataset(dataset_dir, tokenizer):
+def load_test_dataset(dataset_dir, tokenizer, token_type):
     """
     test dataset을 불러온 후,
     tokenizing 합니다.
     """
-    test_dataset = load_data(dataset_dir)
+    test_dataset = load_data(dataset_dir, token_type)
     test_label = list(map(int,test_dataset['label'].values))
     # tokenizing dataset
     tokenized_test = tokenized_dataset(test_dataset, tokenizer)
@@ -80,9 +81,12 @@ def main(args):
 
     #print(model)
 
+    with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
+        token_type = json.load(f)
+
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer

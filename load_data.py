@@ -72,8 +72,8 @@ class Preprocessing_dataset:
         subject_entity = []
         object_entity = []
         for i,j in zip(dataset['subject_entity'], dataset['object_entity']):
-            i = i[1:-1].split(',')[0].split(':')[1]
-            j = j[1:-1].split(',')[0].split(':')[1]
+            i = i[1:-1].split(',')[0].split(':')[1][2:-1]
+            j = j[1:-1].split(',')[0].split(':')[1][2:-1]
 
             subject_entity.append(i)
             object_entity.append(j)
@@ -134,7 +134,16 @@ class Preprocessing_dataset:
         return out_dataset
 
 def load_data(dataset_dir, token_type='origin'):
-    """ csv 파일을 경로에 맡게 불러 옵니다. """
+    """
+    Arguments:
+        dataset_dir (dataset path): dataset 파일 경로
+        token_type (str, optional): entity token 추가 방법
+            Should be one of
+            - 'origin' : entity token 추가하지 않음
+            - 'entity' : [ENT], [/ENT] token 추가
+            - 'type_entity' : word type 별로 token 추가
+            - 'sub_obj' : subject와 object 별개로 token 추가
+    """
     pd_dataset = pd.read_csv(dataset_dir)
     dataset = Preprocessing_dataset(pd_dataset,token_type).return_dataset()
     print("preprocessing finished")

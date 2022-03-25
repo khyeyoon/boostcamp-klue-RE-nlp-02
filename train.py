@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 import random
@@ -135,21 +136,27 @@ def train(args):
     model.to(device)
     
     train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
-    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = True)
+    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
 
     optim = AdamW(model.parameters(), lr=args.lr)
 
-    wandb.log({
+    save_path = args.save_dir
+
+    model_config_parameters = {
         "model":args.model,
         "seed":args.seed,
         "epochs":args.epochs,
         "batch_size":args.batch_size,
+        "token_type":args.token_type,
         "optimizer":args.optimizer,
         "lr":args.lr,
         "val_ratio":args.val_ratio,
-    })
+    }
 
-    save_path = args.save_dir
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+
+    with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
+        json.dump(model_config_parameters, indent=4)
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
@@ -250,7 +257,6 @@ def train(args):
     
 def main(args):
     seed_everything(args.seed)
-    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name)
     train(args)
 
 if __name__ == '__main__':
@@ -270,7 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
-    parser.add_argument('--token_type', type=str, default="origin")
+    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj
 
     args = parser.parse_args()
     main(args)
