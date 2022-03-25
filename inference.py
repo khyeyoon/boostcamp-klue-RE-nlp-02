@@ -49,12 +49,12 @@ def num_to_label(label):
     
     return origin_label
 
-def load_test_dataset(dataset_dir, tokenizer):
+def load_test_dataset(dataset_dir, tokenizer, token_type):
     """
     test dataset을 불러온 후,
     tokenizing 합니다.
     """
-    test_dataset = load_data(dataset_dir)
+    test_dataset = load_data(dataset_dir, token_type)
     test_label = list(map(int,test_dataset['label'].values))
     # tokenizing dataset
     tokenized_test = tokenized_dataset(test_dataset, tokenizer)
@@ -82,7 +82,7 @@ def main(args):
 
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, agrs.token_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
@@ -104,6 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', type=str, default="./results/best_f1")
     parser.add_argument('--submission_name', type=str, default="submission")
     parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--token_type', type=str, default="origin")
 
     args = parser.parse_args()
     print(args)
