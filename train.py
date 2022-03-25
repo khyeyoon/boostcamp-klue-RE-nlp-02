@@ -153,7 +153,7 @@ def train(args):
         "val_ratio":args.val_ratio,
     }
 
-    wandb.log(model_config_parameters)
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
 
     with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
         json.dump(model_config_parameters, indent=4)
@@ -257,7 +257,6 @@ def train(args):
     
 def main(args):
     seed_everything(args.seed)
-    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name)
     train(args)
 
 if __name__ == '__main__':
