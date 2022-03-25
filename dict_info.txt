@@ -1,32 +1,375 @@
 {
     'no_relation': 0,                           # 관계 없음
-    'org:top_members/employees': 1,             # 최고 멤버 / 직원
-    'org:members': 2,                           # 멤버들
-    'org:product': 3,                           # 제품
-    'per:title': 4,                             # 제목
-    'org:alternate_names': 5,                   # 닉네임, 별칭
-    'per:employee_of': 6,                       #
-    'org:place_of_headquarters': 7,             #
-    'per:product': 8,                           #
-    'org:number_of_employees/members': 9,       #
-    'per:children': 10,                         #
-    'per:place_of_residence': 11,               #
-    'per:alternate_names': 12,                  #
-    'per:other_family': 13,                     #
-    'per:colleagues': 14,                       #
-    'per:origin': 15,                           #
-    'per:siblings': 16,                         #
-    'per:spouse': 17,                           #
-    'org:founded': 18,                          #
-    'org:political/religious_affiliation': 19,  #
-    'org:member_of': 20,                        #
-    'per:parents': 21,                          # 부모님
-    'org:dissolved': 22,                        #
-    'per:schools_attended': 23,                 #
-    'per:date_of_death': 24,                    # 죽은 날짜
-    'per:date_of_birth': 25,                    # 태어난 날짜
-    'per:place_of_birth': 26,                   # 태어난 장소
-    'per:place_of_death': 27,                   # 죽은 장소
-    'org:founded_by': 28,                       #
-    'per:religion': 29                          # 지역
+    'org:top_members/employees': 1,             # org: 톱 멤버
+    'org:members': 2,                           # org: 회원들
+    'org:product': 3,                           # org: 제품 
+    'per:title': 4,                             # per: 직함
+    'org:alternate_names': 5,                   # org: 대체 이름
+    'per:employee_of': 6,                       # per: 종업원
+    'org:place_of_headquarters': 7,             # org: 본부 소재지
+    'per:product': 8,                           # per: 제품
+    'org:number_of_employees/members': 9,       # org: 종업원수/회원수
+    'per:children': 10,                         # per: 아이들
+    'per:place_of_residence': 11,               # per: 거주지
+    'per:alternate_names': 12,                  # per: 대체 이름
+    'per:other_family': 13,                     # per: 다른 가족
+    'per:colleagues': 14,                       # per: 동료들
+    'per:origin': 15,                           # per: 출신
+    'per:siblings': 16,                         # per: 형제자매
+    'per:spouse': 17,                           # per: 배우자
+    'org:founded': 18,                          # org: 설립된 날
+    'org:political/religious_affiliation': 19,  # org: 정치적/종교적 제휴
+    'org:member_of': 20,                        # org: 멤버
+    'per:parents': 21,                          # per: 부모님
+    'org:dissolved': 22,                        # org: 해체된 날
+    'per:schools_attended': 23,                 # per: 학교
+    'per:date_of_death': 24,                    # per: 사망일
+    'per:date_of_birth': 25,                    # per: 출생일
+    'per:place_of_birth': 26,                   # per: 출생지
+    'per:place_of_death': 27,                   # per: 죽은 장소
+    'org:founded_by': 28,                       # org: 설립자
+    'per:religion': 29                          # per: 종교
 }
+
+
+- dictionary key (english name)
+explanation
+
+example sentence
+e_subj
+e_obj
+
+==================================================================================
+
+- 관계 없음 (no_relation)
+e_subj, e_obj 사이에 관계가 없습니다.
+
+〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
+{'word': '비틀즈', 'start_idx': 24, 'end_idx': 26, 'type': 'ORG'}
+{'word': '조지 해리슨', 'start_idx': 13, 'end_idx': 18, 'type': 'PER'}
+
+
+- org: 해체된 날 (dissolved)
+지정된 조직이 해체된 날짜
+
+1959년 한국 전쟁으로 폐교된 대성여자중학교를 부활시키고 1960년에는 대성여자고등학교를 세웠다.
+{'word': '대성여자중학교', 'start_idx': 18, 'end_idx': 24, 'type': 'ORG'}
+{'word': '1959년', 'start_idx': 0, 'end_idx': 4, 'type': 'DAT'}
+
+
+- org: 설립된 날 (founded)
+지정된 조직이 설립된 날짜
+
+1984년에는 포스트시즌을 포함해 56경기 324.2이닝, 31승, 6세이브, 18완투, 258탈삼진(한국시리즈 5경기 40이닝, 4승, 4완투, 35탈삼진)으로 KBO 리그 역사상 유일하게 한국시리즈 4승을 올리며 1984년 롯데 자이언츠가 창단 첫 우승을 하는 데 크게 기여하는 등 KBO 리그 초창기를 이끌었다.
+{'word': '롯데 자이언츠', 'start_idx': 127, 'end_idx': 133, 'type': 'ORG'}	
+{'word': '1984년', 'start_idx': 121, 'end_idx': 125, 'type': 'DAT'}
+
+
+- org: 본부 소재지 (place_of_headquarters)
+특정 조직의 본사가 있는 장소
+
+중공군에게 온전히 대항할 수 없을 정도로 약해진 국민당은 타이베이로 수도를 옮기는 것을 결정해, 남아있는 중화민국군의 병력이나 국가, 개인의 재산등을 속속 타이완으로 옮기기 시작해, 12월에는 중앙 정부 기구도 모두 이전해 타이베이 시를 중화민국의 새로운 수도로 삼았다.
+{'word': '중화민국', 'start_idx': 59, 'end_idx': 62, 'type': 'ORG'}
+{'word': '타이베이', 'start_idx': 32, 'end_idx': 35, 'type': 'LOC'}
+
+
+- org: 대체 이름 (alternate_names)
+지정된 조직을 나타내기 위해 공식 이름 대신 호출된 대체 이름
+
+: 유엔, 유럽 의회, 북대서양 조약 기구 (NATO), 국제이주기구, 세계 보건 기구 (WHO), 지중해 연합, 이슬람 협력 기구, 유럽 안보 협력 기구, 국제 통화 기금, 세계무역기구 그리고 프랑코포니.
+{'word': '북대서양 조약 기구', 'start_idx': 13, 'end_idx': 22, 'type': 'ORG'}
+{'word': 'NATO', 'start_idx': 25, 'end_idx': 28, 'type': 'ORG'}
+
+
+- org: 멤버 (member_of)
+지정된 조직이 속한 조직
+
+K리그2에서 성적 1위를 달리고 있는 광주FC는 지난 26일 한국프로축구연맹으로부터 관중 유치 성과와 마케팅 성과를 인정받아 ‘풀 스타디움상’과 ‘플러스 스타디움상’을 수상했다.
+{'word': '광주FC', 'start_idx': 21, 'end_idx': 24, 'type': 'ORG'}
+{'word': '한국프로축구연맹', 'start_idx': 34, 'end_idx': 41, 'type': 'ORG'}
+
+
+- org: 회원들 (members)
+지정된 조직에 속하는 조직
+
+뉴질랜드 1차산업부 생물보안 대변인 캐서린 더시 박사는 과일파리를 잡기 위해 오클랜드 전역에 1천300여개의 파리통을 놓았다며, 곧 통들을 마지막으로 점검할 것이라고 말했다.
+{'word': '뉴질랜드', 'start_idx': 0, 'end_idx': 3, 'type': 'ORG'}
+{'word': '오클랜드', 'start_idx': 43, 'end_idx': 46, 'type': 'LOC'}
+
+
+- org: 정치적/종교적 제휴 (political/religious_affiliation)
+특정 조직이 소속된 정치/종교 단체
+
+1924년 11월 26일에는 정부 형태를 군주제에서 인민 공화제로 고쳐 국호를 몽골 인민 공화국으로 정하고, 세계에서 2번째로 공산주의 국가가 되었다.
+{'word': '몽골 인민 공화국', 'start_idx': 44, 'end_idx': 52, 'type': 'ORG'}
+{'word': '공화제', 'start_idx': 32, 'end_idx': 34, 'type': 'POH'}
+
+
+- org: 제품 (product)
+지정된 기관에서 생산한 제품 또는 상품
+
+그는 “기업 측의 보수적인 가이던스를 참고해보면 올해 매출액 1조원은 최저 준”이라며 “업사이드 가시성이 기대된다. 삼성전자의 D램 증설, 낸드 증설, LSI 증설이 원익IPS의 실적 성장을 견인할 것”이라고 전망했다. \\[ 위에서 두 번째 예시]\\
+{'word': '삼성전자', 'start_idx': 65, 'end_idx': 68, 'type': 'ORG'}
+{'word': 'LSI', 'start_idx': 85, 'end_idx': 87, 'type': 'ORG'}
+
+
+- org: 설립자 (founded_by)
+지정된 조직을 설립한 사람 또는 조직
+
+로버트 조지 (바비) 실(Robert George (Bobby)(Bobby) Seale, 1936년 10월 22일 ~ )은 아프리카계 미국인 인권 운동가이자, 휴이 뉴튼과 함께 흑표당의 창립자이다.
+{'word': '흑표당', 'start_idx': 99, 'end_idx': 101, 'type': 'ORG'}
+{'word': '휴이 뉴튼', 'start_idx': 89, 'end_idx': 93, 'type': 'PER'}
+
+
+- org: 톱 멤버 (top_members) / 직원들
+지정된 조직의 대표자 또는 구성원
+
+균일가 생활용품점 (주)아성다이소(대표 박정부)는 코로나19 바이러스로 어려움을 겪고 있는 대구광역시에 행복박스를 전달했다고 10일 밝혔다.
+{'word': '아성다이소', 'start_idx': 13, 'end_idx': 17, 'type': 'ORG'}
+{'word': '박정부', 'start_idx': 22, 'end_idx': 24, 'type': 'PER'}
+
+
+- org: 종업원수/회원수 (number_of_employees/members)
+지정된 조직에 소속된 총 구성원 수
+
+냉전 동안 독일 연방군은 NATO의 서유럽 방위의 주력군이 되었으며 전군을 통틀어 49만 5,000명의 병력과 17만명의 군무원을 거느리고 있었다.
+{'word': '독일 연방군', 'start_idx': 6, 'end_idx': 11, 'type': 'ORG'}
+{'word': '49만 5,000명', 'start_idx': 46, 'end_idx': 55, 'type': 'NOH'}
+
+
+- per: 출생일 (date_of_birth)
+지정된 사람이 태어난 날짜
+
+박용오(朴容旿, 1937년 4월 29일(음력 3월 19일)(음력 3월 19일) ~ 2009년 11월 4일)는 서울에서 태어난 대한민국의 기업인으로 두산그룹 회장, KBO 총재 등을 역임했다.
+{'word': '박용오', 'start_idx': 0, 'end_idx': 2, 'type': 'PER'}
+{'word': '1937년 4월 29일', 'start_idx': 9, 'end_idx': 20, 'type': 'DAT'}
+
+
+- per: 사망일 (date_of_death)
+지정된 사람이 사망한 날짜
+
+김경징이 처형되지 않고 귀양을 가게 되자 신하들은 완강히 김경징과 당시 강화부유수 장신을 책임을 물어 죽여야 한다고 거듭 주장하였고, 결국 1637년 2월 22일 인조는 김경징과 장신에게 사약을 내렸다.
+{'word': '김경징', 'start_idx': 32, 'end_idx': 34, 'type': 'PER'}
+{'word': '1637년 2월 22일', 'start_idx': 78, 'end_idx': 89, 'type': 'DAT'}
+
+
+- per: 출생지 (place_of_birth)
+지정된 사람이 태어난 장소
+
+백한성(白漢成, 水原鶴人, 1899년 6월 15일 조선 충청도 공주 출생 ~ 1971년 10월 13일 대한민국 서울에서 별세.)은 대한민국의 정치가이며 법조인이다.
+{'word': '백한성', 'start_idx': 0, 'end_idx': 2, 'type': 'PER'}
+{'word': '조선 충청도 공주', 'start_idx': 28, 'end_idx': 36, 'type': 'LOC'}
+
+
+- per: 죽은 장소 (place_of_death)
+지정된 사람이 사망한 장소
+
+2010년 3월 29일, 최진영은 서울특별시 강남구 논현동의 자택에서 스스로 세상을 떠났다.
+{'word': '최진영', 'start_idx': 14, 'end_idx': 16, 'type': 'PER'}
+{'word': '서울특별시 강남구', 'start_idx': 19, 'end_idx': 27, 'type': 'LOC'}
+
+
+- per: 거주지 (place_of_residence)
+지정된 사람이 거주하는 장소
+
+이어 “6월 항쟁의 미완성을 통해 민주주의 후퇴를 겪었다. 국민들이 촛불혁명으로 탄생시킨 문재인 정부는 반드시 성공시켜야 한다”며 “정치혁신을 통해 대한민국의 변화를 꿈꿨던 국민들의 바램, 광주의 꿈을 반드시 이룰 것이다”고 밝혔다.
+{'word': '문재인', 'start_idx': 50, 'end_idx': 52, 'type': 'PER'}
+{'word': '대한민국', 'start_idx': 83, 'end_idx': 86, 'type': 'LOC'}
+
+
+- per: 출신 (origin)
+지정된 사람의 출신 또는 국적
+
+하비에르 파스토레는 아르헨티나 클럽 타예레스의 유소년팀에서 축구를 시작하였다.
+{'word': '하비에르 파스토레', 'start_idx': 0, 'end_idx': 8, 'type': 'PER'}
+{'word': '아르헨티나', 'start_idx': 11, 'end_idx': 15, 'type': 'LOC'}
+
+
+- per: 종업원 (employee_of)
+지정된 사람이 일하는 조직
+
+특히 김동연 전 경제부총리를 비롯한 김두관 국회의원, 안규백 국회의원, 김종민 국회의원, 오제세 국회의원, 최운열 국회의원, 김정우 국회의원, 권칠승 국회의원, 맹성규 국회의원등 더불어민주당 국회의원 8명이 영상 축하 메세지를 보내 눈길을 끌었다.
+{'word': '안규백', 'start_idx': 30, 'end_idx': 32, 'type': 'PER'}
+{'word': '더불어민주당', 'start_idx': 100, 'end_idx': 105, 'type': 'ORG'}
+
+
+- per: 학교 (schools_attended)
+지정된 사람이 다녔던 학교
+
+문성민은 경기대학교에 입학하여 황동일, 신영석과 함께 경기대학교의 전성기를 이끌면서 하계대회, 전국체전, 최강전 등 3관왕을 이룬다.
+{'word': '문성민', 'start_idx': 0, 'end_idx': 2, 'type': 'PER'}
+{'word': '경기대', 'start_idx': 5, 'end_idx': 7, 'type': 'ORG'}
+
+
+- per: 대체 이름 (alternate_names)
+공식 명칭 대신 지정된 사람을 지칭하는 대체 명칭
+
+2010년에는 아시아 가수 최초로 마이클 잭슨의 곡을 리메이크하였는데 당시 마이클 잭슨과 함께 작업했던 세계적인 뮤지션 스티브 바라캇(Steve Barakatt)과 마이클 잭슨 곡 "You are not alone"을 작업해 화제가 되었다.
+{'word': '스티브 바라캇', 'start_idx': 67, 'end_idx': 73, 'type': 'PER'}
+{'word': 'Steve Barakatt', 'start_idx': 75, 'end_idx': 88, 'type': 'PER'}
+
+
+- per: 부모님 (parents)
+지정된 사람의 부모
+
+후지와라노 쇼시/다마코(1101년 - 1145년 9월 10일)은 헤이안 시대 도바 천황의 중궁이자, 스토쿠 천황과 고시라카와 천황의 생모로 니조 천황과 다카쿠라 천황의 할머니이다.
+{'word': '다카쿠라 천황', 'start_idx': 85, 'end_idx': 91, 'type': 'PER'}
+{'word': '고시라카와 천황', 'start_idx': 64, 'end_idx': 71, 'type': 'PER'}
+
+
+- per: 아이들 (children)
+지정된 사람의 자녀
+
+1555년 카를 5세의 퇴위로, 그의 영지는 아들 스페인의 국왕 펠리페 2세와 동생 페르디난트 1세 둘 사이로 나뉘었다.
+{'word': '카를 5세', 'start_idx': 6, 'end_idx': 10, 'type': 'PER'}
+{'word': '펠리페', 'start_idx': 36, 'end_idx': 38, 'type': 'PER'}
+
+
+- per: 형제자매 (siblings)
+지정된 사람의 형제자매
+
+본래 하후(夏侯)씨로, 하후돈(夏侯惇)과 하후연의 숙부였으나 환관인 십상시 조등(曹騰)의 양자가 되었다.
+{'word': '하후돈', 'start_idx': 13, 'end_idx': 15, 'type': 'PER'}
+{'word': '하후연', 'start_idx': 23, 'end_idx': 25, 'type': 'PER'}
+
+
+- per: 배우자 (spouse)
+지정된 사람의 배우자(들)
+
+박흥식은 첫 부인과의 사이에 장녀 박병숙을 두었고, 두 번째 부인은 경희대학교 교수를 지낸 피아니스트 한인하이며, 두 사람 사이에서 태어난 딸 박봉숙은 이화여자대학교 교수를 지냈다.
+{'word': '박흥식', 'start_idx': 0, 'end_idx': 2, 'type': 'PER'}
+{'word': '한인하', 'start_idx': 57, 'end_idx': 59, 'type': 'PER'}
+
+
+- per: 다른 가족 (other_family)
+부모, 자녀, 형제자매 및 배우자 이외의 지정된 사람의 가족
+
+그러나 빅토리아가 태어난 지 1년 만에 에드워드는 사망했고 그녀는 말도 통하지 않는 곳에 홀로 남겨지게 되었지만 자신의 딸이 윌리엄 4세 국왕 사후에 영국의 여왕으로 즉위하는 것이 거의 확정적인 분위기였다.
+{'word': '윌리엄 4세', 'start_idx': 70, 'end_idx': 75, 'type': 'PER'}
+{'word': '빅토리아', 'start_idx': 4, 'end_idx': 7, 'type': 'PER'}
+
+
+- per: 동료들 (colleagues)
+지정된 사람과 함께 일하는 사람
+
+1971년 대선을 앞두고 김종필은 1971년 선거에서 박정희 당선을 위해 무려 600억원이나 썼다고 밝혔다.
+{'word': '김종필', 'start_idx': 14, 'end_idx': 16, 'type': 'PER'}
+{'word': '박정희', 'start_idx': 30, 'end_idx': 32, 'type': 'PER'}
+
+
+- per: 제품 (product)
+지정된 사람이 제작한 제품 또는 아트웍
+
+밴드는 마이클 잭슨의 《Thriller》 음반 제작을 돕고 같은 해 시카고의 컴백 음반 《Chicago 16》에 대한 공동작업을 하기 위해 음반 발매 후 순회공연을 연기했다.
+{'word': '마이클 잭슨', 'start_idx': 4, 'end_idx': 9, 'type': 'PER'}
+{'word': 'Thriller', 'start_idx': 13, 'end_idx': 20, 'type': 'POH'}
+
+
+- per: 종교 (religion)
+지정된 사람이 믿는 종교
+
+개신교 신학자이자 유니온 신학교 교수로 일하던 라인홀트 니부어가 신학 교수 자리를 마련한 뒤, 초대장을 보냈기 때문이다.
+{'word': '라인홀트 니부어', 'start_idx': 26, 'end_idx': 33, 'type': 'PER'}
+{'word': '개신교', 'start_idx': 0, 'end_idx': 2, 'type': 'ORG'}
+
+
+- per: 직함 (title)
+지정된 사람의 직위를 나타내는 공식 또는 비공식 명칭
+
+이른바 'Z세대'로 불리는 1990년대 중반 이후 태어난 세대에게 대표 아이콘으로 통하는 미국 싱어송라이터 빌리 아일리시(본명 빌리 오코널, 19)가 팝 역사를 새로 썼다.
+{'word': '빌리 아일리시', 'start_idx': 60, 'end_idx': 66, 'type': 'PER'}
+{'word': '싱어송라이터', 'start_idx': 53, 'end_idx': 58, 'type': 'POH'}
+
+
+---
+
+- no_relation
+No relation in between (esubj, eobj)
+
+- org: dissolved
+The date when the specified organization was dissolved
+
+- org: founded
+The date when the specified organization was founded
+
+- org: place_of_headquarters
+The place which the headquarters of the specified organization are located in
+
+- org: alternate_names
+Alternative names called instead of the official name to refer to the specified organization
+
+- org: member_of
+Organizations to which the specified organization belongs
+
+- org: members
+Organizations which belong to the specified organization
+
+- org: political/religious_affiliation
+Political/religious groups which the specified organization is affiliated in
+
+- org: product
+Products or merchandise produced by the specified organization
+
+- org: founded_by
+The person or organization that founded the specified organization
+
+- org: top_members/employees
+The representative(s) or members of the specified organization
+
+- org: number_of_employees/members
+The total number of members that are affiliated int the specified organization
+
+
+- per: date_of_birth
+The date when the specified person was born
+
+- per: date_of_death
+The date when the specified person died
+
+- per: place_of_birth
+The place where the specified person was born
+
+- per: place_of_death
+The place where the specified person died
+
+- per: place_of_residence
+The place where the specified person lives
+
+- per: origin
+The origins or the nationality of the specified person
+
+- per: employee_of
+The organization where the specified person works
+
+- per: schools_attended
+A school where the specified person attended
+
+- per: alternate_names
+Alternative names called instead of the official name to refer to the speficied person
+
+- per: parents
+The parents of the specified person
+
+- per: children
+The children of the specified person
+
+- per: siblings
+The brothers and sisters of the specified person
+
+- per: spouse
+The spouse(s) of the specified person
+
+- per: other_family
+Family members of the specified person other than parents, children, siblings, and spouse(s)
+
+- per: colleagues
+People who work together with the specified person
+
+- per: product
+Products or artworks produced by the specified person
+
+- per: religion
+The religion in which the specified person believes
+
+- per: title
+Official or unofficial names that represent the occupational position of the specified person
