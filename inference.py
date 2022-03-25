@@ -1,3 +1,4 @@
+import json
 from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
@@ -80,9 +81,12 @@ def main(args):
 
     #print(model)
 
+    with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
+        token_type = json.load(f)
+
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, agrs.token_type)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
@@ -104,7 +108,6 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', type=str, default="./results/best_f1")
     parser.add_argument('--submission_name', type=str, default="submission")
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--token_type', type=str, default="origin")
 
     args = parser.parse_args()
     print(args)

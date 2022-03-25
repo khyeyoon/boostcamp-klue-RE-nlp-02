@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 import random
@@ -139,17 +140,23 @@ def train(args):
 
     optim = AdamW(model.parameters(), lr=args.lr)
 
-    wandb.log({
+    save_path = args.save_dir
+
+    model_config_parameters = {
         "model":args.model,
         "seed":args.seed,
         "epochs":args.epochs,
         "batch_size":args.batch_size,
+        "token_type":args.token_type,
         "optimizer":args.optimizer,
         "lr":args.lr,
         "val_ratio":args.val_ratio,
-    })
+    }
 
-    save_path = args.save_dir
+    wandb.log(model_config_parameters)
+
+    with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
+        json.dump(model_config_parameters, indent=4)
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
