@@ -155,8 +155,9 @@ def train(args):
 
     wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
 
+    os.makedirs(save_path, exist_ok=True)
     with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
-        json.dump(model_config_parameters, indent=4)
+        json.dump(model_config_parameters, f, indent=4)
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
