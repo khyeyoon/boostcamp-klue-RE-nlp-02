@@ -16,7 +16,7 @@ def inference(model, tokenized_sent, device):
     test dataset을 DataLoader로 만들어 준 후,
     batch_size로 나눠 model이 예측 합니다.
     """
-    dataloader = DataLoader(tokenized_sent, batch_size=16, shuffle=False)
+    dataloader = DataLoader(tokenized_sent, batch_size=64, shuffle=False)
     model.eval()
     output_pred = []
     output_prob = []
@@ -70,11 +70,15 @@ def main(args):
     # Tokenizer_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
+    print('tokenizer', tokenizer)
+
     ## load my model
     MODEL_NAME = args.model_dir # model dir.
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
     model.parameters
     model.to(device)
+
+    #print(model)
 
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
@@ -99,6 +103,8 @@ if __name__ == '__main__':
     # model dir
     parser.add_argument('--model_dir', type=str, default="./results/best_f1")
     parser.add_argument('--submission_name', type=str, default="submission")
+    parser.add_argument('--batch_size', type=int, default=64)
+
     args = parser.parse_args()
     print(args)
     main(args)

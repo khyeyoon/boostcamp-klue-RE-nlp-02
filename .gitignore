@@ -9,5 +9,5 @@
 /wandb
 /tokenizer
 ._*
-shell.sh
+*.sh
 *.out
