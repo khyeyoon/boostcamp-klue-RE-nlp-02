@@ -136,7 +136,7 @@ def train(args):
     model.to(device)
     
     train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
-    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = True)
+    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
 
     optim = AdamW(model.parameters(), lr=args.lr)
 
