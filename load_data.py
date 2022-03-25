@@ -1,8 +1,8 @@
 import os
 import torch
+import re
 import pandas as pd
 import pickle as pickle
-import re
 
 
 class RE_Dataset(torch.utils.data.Dataset):
@@ -29,7 +29,7 @@ class Preprocessing_dataset:
             return self.preprocessing_dataset_v1(self.dataset)
         elif self.token_type=='type_entity':
             return self.preprocessing_dataset_v2(self.dataset)
-        elif self.token_type=='sub/obj':
+        elif self.token_type=='sub_obj':
             return self.preprocessing_dataset_v3(self.dataset)
         else:
             return self.preprocessing_dataset(self.dataset)
@@ -117,7 +117,7 @@ class Preprocessing_dataset:
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
     
-    def preprocessing_dataset_v3(dataset):
+    def preprocessing_dataset_v3(self, dataset):
         pre_sentence = []
         subject_entity = []
         object_entity = []
@@ -150,13 +150,13 @@ def tokenized_dataset(dataset, tokenizer):
         concat_entity.append(temp)
 
     tokenized_sentences = tokenizer(
-      concat_entity,
-      list(dataset['sentence']),
-      return_tensors="pt",
-      padding=True,
-      truncation=True,
-      max_length=256,
-      add_special_tokens=True,
-      )
+        concat_entity,
+        list(dataset['sentence']),
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=256,
+        add_special_tokens=True,
+        )
     
     return tokenized_sentences

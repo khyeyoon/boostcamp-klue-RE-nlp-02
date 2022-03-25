@@ -85,7 +85,7 @@ def label_to_num(label):
     
     return num_label
 
-def seed_everything(seed=42):
+def seed_everything(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if use multi-GPU
@@ -102,7 +102,7 @@ def train(args):
         'origin':[],
         'entity':["[ENT]", "[/ENT]"],
         'type_entity':["[ORG]","[/ORG]","[PER]","[/PER]","[POH]","[/POH]","[LOC]","[/LOC]","[DAT]","[/DAT]","[NOH]","[/NOH]"],
-        'sub/obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
+        'sub_obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
     }
     num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type)})    
 
@@ -134,8 +134,8 @@ def train(args):
     print(model.config)
     model.to(device)
     
-    train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True)
-    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True)
+    train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
+    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = True)
 
     optim = AdamW(model.parameters(), lr=args.lr)
 
@@ -185,7 +185,7 @@ def train(args):
             average_acc = total_acc/total_idx
 
             wandb.log({
-                "epoch":epoch,
+                "epoch":epoch+1,
                 "train_loss":average_loss,
                 "train_f1":average_f1,
                 "train_acc":average_acc
@@ -221,23 +221,24 @@ def train(args):
                 eval_total_auprc += eval_metric['auprc']
                 eval_total_acc += eval_metric['accuracy']
 
-                eval_average_loss = eval_total_loss/eval_total_idx
-                eval_average_f1 = eval_total_f1/eval_total_idx
-                eval_average_acc = eval_total_acc/eval_total_idx
+            eval_average_loss = eval_total_loss/eval_total_idx
+            eval_average_f1 = eval_total_f1/eval_total_idx
+            eval_average_acc = eval_total_acc/eval_total_idx
 
-                if eval_average_loss < best_eval_loss:
-                    model.save_pretrained(os.path.join(save_path, "best_loss"))
-                    best_eval_loss = eval_average_loss
+            if eval_average_loss < best_eval_loss:
+                model.save_pretrained(os.path.join(save_path, "best_loss"))
+                best_eval_loss = eval_average_loss
 
-                if eval_average_f1 > best_eval_f1:
-                    model.save_pretrained(os.path.join(save_path, "best_f1"))
-                    best_eval_f1 = eval_average_f1
+            if eval_average_f1 > best_eval_f1:
+                model.save_pretrained(os.path.join(save_path, "best_f1"))
+                best_eval_f1 = eval_average_f1
 
-                wandb.log({
-                    "eval_loss":eval_average_loss,
-                    "eval_f1":eval_average_f1,
-                    "eval_acc":eval_average_acc
-                    })
+            wandb.log({
+                "epoch":epoch+1,
+                "eval_loss":eval_average_loss,
+                "eval_f1":eval_average_f1,
+                "eval_acc":eval_average_acc
+                })
 
             print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
             print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
