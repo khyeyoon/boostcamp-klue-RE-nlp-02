@@ -82,7 +82,7 @@ def main(args):
 
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, agrs.token_type)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, args.token_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
