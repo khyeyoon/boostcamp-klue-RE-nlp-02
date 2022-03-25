@@ -72,8 +72,8 @@ class Preprocessing_dataset:
         subject_entity = []
         object_entity = []
         for i,j in zip(dataset['subject_entity'], dataset['object_entity']):
-            i = i[1:-1].split(',')[0].split(':')[1]
-            j = j[1:-1].split(',')[0].split(':')[1]
+            i = i[1:-1].split(',')[0].split(':')[1][2:-1]
+            j = j[1:-1].split(',')[0].split(':')[1][2:-1]
 
             subject_entity.append(i)
             object_entity.append(j)
