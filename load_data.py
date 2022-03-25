@@ -29,7 +29,7 @@ class Preprocessing_dataset:
             return self.preprocessing_dataset_v1(self.dataset)
         elif self.token_type=='type_entity':
             return self.preprocessing_dataset_v2(self.dataset)
-        elif self.token_type=='sub/obj':
+        elif self.token_type=='sub_obj':
             return self.preprocessing_dataset_v3(self.dataset)
         else:
             return self.preprocessing_dataset(self.dataset)
@@ -117,15 +117,15 @@ class Preprocessing_dataset:
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
     
-    def preprocessing_dataset_v3(dataset):
+    def preprocessing_dataset_v3(self, dataset):
         pre_sentence = []
         subject_entity = []
         object_entity = []
         for s,i,j in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             i = i[1:-1].split(',')[0].split(':')[1][2:-1]
             j = j[1:-1].split(',')[0].split(':')[1][2:-1]
-            s = re.sub(i, '[sub_ent]'+i+'[/sub_ent]', s)
-            s = re.sub(j, '[obj_ent]'+j+'[/obj_ent]', s)
+            s = re.sub(i, '[SUB_ENT]'+i+'[/SUB_ENT]', s)
+            s = re.sub(j, '[OBJ_ENT]'+j+'[/OBJ_ENT]', s)
 
             subject_entity.append(i)
             object_entity.append(j)
@@ -141,7 +141,7 @@ def load_data(dataset_dir, token_type='origin'):
 
     return dataset
 
-def tokenized_dataset(dataset, tokenizer, max_length):
+def tokenized_dataset(dataset, tokenizer):
     """ tokenizer에 따라 sentence를 tokenizing 합니다."""
     concat_entity = []
     for e01, e02 in zip(dataset['subject_entity'], dataset['object_entity']):
@@ -155,7 +155,7 @@ def tokenized_dataset(dataset, tokenizer, max_length):
         return_tensors="pt",
         padding=True,
         truncation=True,
-        max_length=max_length,
+        max_length=256,
         add_special_tokens=True,
         )
     

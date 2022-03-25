@@ -4,10 +4,10 @@
 /.ipynb_checkpoints
 /__pycache__
 /prediction
-/results
+/result*
 /bests
 /wandb
 /tokenizer
 ._*
-shell.sh
+*.sh
 *.out

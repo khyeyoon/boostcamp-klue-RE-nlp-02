@@ -1,4 +1,3 @@
-import json
 from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
@@ -50,7 +49,7 @@ def num_to_label(label):
     
     return origin_label
 
-def load_test_dataset(dataset_dir, tokenizer, max_length):
+def load_test_dataset(dataset_dir, tokenizer):
     """
     test dataset을 불러온 후,
     tokenizing 합니다.
@@ -58,7 +57,7 @@ def load_test_dataset(dataset_dir, tokenizer, max_length):
     test_dataset = load_data(dataset_dir)
     test_label = list(map(int,test_dataset['label'].values))
     # tokenizing dataset
-    tokenized_test = tokenized_dataset(test_dataset, tokenizer, max_length)
+    tokenized_test = tokenized_dataset(test_dataset, tokenizer)
     return test_dataset['id'], tokenized_test, test_label
 
 def main(args):
@@ -66,29 +65,24 @@ def main(args):
     주어진 dataset csv 파일과 같은 형태일 경우 inference 가능한 코드입니다.
     """
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    ##############################################################################
     # load tokenizer
-    Tokenizer_NAME = args.tokenizer_name #"klue/bert-base"
-    #tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_dir)
-    #############################################################################
-    # config_path = os.path.join(args.model_dir, "config.json")
-    # with open(config_path, 'r') as json_file:
-    #     json_data = json.load(json_file)
-    #     Tokenizer_NAME = json_data["_name_or_path"]
+    Tokenizer_NAME = os.path.join(args.model_dir, "..")
+    # Tokenizer_NAME = "klue/bert-base"
+    tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
-    # # Tokenizer_NAME = "klue/bert-base"
-    # tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
-    ##############################################################################
+    print('tokenizer', tokenizer)
+
     ## load my model
     MODEL_NAME = args.model_dir # model dir.
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
     model.parameters
     model.to(device)
 
+    #print(model)
+
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, args.max_length)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
@@ -107,11 +101,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # model dir
-    parser.add_argument('--model_dir', type=str, default="./best_model")
+    parser.add_argument('--model_dir', type=str, default="./results/best_f1")
     parser.add_argument('--submission_name', type=str, default="submission")
-    parser.add_argument('--tokenizer_name', type=str, default="klue/bert-base")
-    parser.add_argument('--tokenizer_dir', type=str, default="./tokenizer/")
-    parser.add_argument('--max_length', type=int, default=256)
+    parser.add_argument('--batch_size', type=int, default=64)
+
     args = parser.parse_args()
     print(args)
     main(args)

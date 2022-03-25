@@ -1,19 +1,23 @@
 import os
 import torch
 import random
+import warnings
 import sklearn
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import pickle as pickle
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments, RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification, BertTokenizer
-# from transformers import BertTokenizerFast, GPT2LMHeadModel
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from load_data import *
 
 import argparse
 import wandb
 
+warnings.filterwarnings("ignore")
 
 def klue_re_micro_f1(preds, labels):
     """KLUE-RE micro f1 (except no_relation)"""
@@ -39,18 +43,27 @@ def klue_re_auprc(probs, labels):
 
     score = np.zeros((30,))
     for c in range(30):
+        # print("labels: ", labels)
         targets_c = labels.take([c], axis=1).ravel()
+        # print("targets_c: ", targets_c)
         preds_c = probs.take([c], axis=1).ravel()
+        # print("preds_c: ", preds_c)
         precision, recall, _ = sklearn.metrics.precision_recall_curve(targets_c, preds_c)
+        # print("precision, recall: ", precision, recall)
         score[c] = sklearn.metrics.auc(recall, precision)
+        # print("score: ", score)
     return np.average(score) * 100.0
 
 
-def compute_metrics(pred):
+def compute_metrics(pred, labels):
     """ validation을 위한 metrics function """
-    labels = pred.label_ids
-    preds = pred.predictions.argmax(-1)
-    probs = pred.predictions
+    # labels = pred.label_ids
+    # preds = pred.predictions.argmax(-1)
+    # probs = pred.predictions
+    pred = pred.detach().cpu().numpy()
+    labels = labels.detach().cpu().numpy()
+    preds = pred.argmax(-1)
+    probs = pred
 
     # calculate accuracy using sklearn's function
     f1 = klue_re_micro_f1(preds, labels)
@@ -83,37 +96,31 @@ def seed_everything(seed):
 
 def train(args):
     # load model and tokenizer
-    # MODEL_NAME = "bert-base-uncased"
     MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-
-    # add special token
-    added_token_num = tokenizer.add_special_tokens({"additional_special_tokens":['[SUB_ENT]','[/SU_ENT]','[OBJ_ENT]','[/OBJ_ENT]']})
-    tokenizer.save_pretrained(args.tokenizer_dir)
-
-    # gpt3-kor-small_based_on_gpt2
-    # tokenizer = BertTokenizerFast.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
-    # input_ids = tokenizer.encode("text to tokenize")[1:]  # remove cls token
-            
-    # MODEL_NAME = GPT2LMHeadModel.from_pretrained("kykim/gpt3-kor-small_based_on_gpt2")
+    special_tokens={
+        'origin':[],
+        'entity':["[ENT]", "[/ENT]"],
+        'type_entity':["[ORG]","[/ORG]","[PER]","[/PER]","[POH]","[/POH]","[LOC]","[/LOC]","[DAT]","[/DAT]","[NOH]","[/NOH]"],
+        'sub_obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
+    }
+    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type)})    
 
     # load dataset
-    dataset = load_data("../dataset/train/train.csv")
-    # dev_dataset = load_data("../dataset/train/dev.csv") # validation용 데이터는 따로 만드셔야 합니다.
-        
+    dataset = load_data("../dataset/train/train.csv", token_type=args.token_type)
+
     train_dataset, valid_dataset = train_test_split(dataset, test_size=args.val_ratio, shuffle=True, stratify=dataset['label'], random_state=args.seed)
 
     train_label = label_to_num(train_dataset['label'].values)
     valid_label = label_to_num(valid_dataset['label'].values)
 
     # tokenizing dataset
-    tokenized_train = tokenized_dataset(train_dataset, tokenizer, args.max_length)
-    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer, args.max_length)
+    tokenized_train = tokenized_dataset(train_dataset, tokenizer)
+    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer)
 
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
     RE_valid_dataset = RE_Dataset(tokenized_valid, valid_label)
-    # RE_dev_dataset = RE_Dataset(tokenized_dev, dev_label)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -122,49 +129,123 @@ def train(args):
     model_config = AutoConfig.from_pretrained(MODEL_NAME)
     model_config.num_labels = 30
 
-    #model load & vocab update
-    model =   AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
-    model.resize_token_embeddings(tokenizer.vocab_size + added_token_num)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
+    model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
     print(model.config)
-    model.parameters
     model.to(device)
     
-    # 사용한 option 외에도 다양한 option들이 있습니다.
-    # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
-    training_args = TrainingArguments(
-        output_dir=args.save_dir,           # output directory
-        save_total_limit=args.save_total_limit,               # number of total save model.
-        save_steps=500,                   # model saving step.
-        num_train_epochs=args.epochs,      # total number of training epochs
-        learning_rate=args.lr,               # learning_rate
-        per_device_train_batch_size=args.batch_size,   # batch size per device during training
-        per_device_eval_batch_size=args.valid_batch_size,    # batch size for evaluation
-        warmup_steps=500,                 # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,                # strength of weight decay
-        logging_dir='./logs',             # directory for storing logs
-        logging_steps=100,                # log saving step.
-        evaluation_strategy='steps',      # evaluation strategy to adopt during training
-                                          # `no`: No evaluation during training.
-                                          # `steps`: Evaluate every `eval_steps`.
-                                          # `epoch`: Evaluate every end of epoch.
-        eval_steps = 500,                 # evaluation step.
-        load_best_model_at_end = True, 
-        report_to="wandb",  # enable logging to W&B
-    )
+    train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
+    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = True)
 
-    trainer = Trainer(
-        model=model,                      # the instantiated 🤗 Transformers model to be trained
-        args=training_args,               # training arguments, defined above
-        train_dataset=RE_train_dataset,   # training dataset
-        eval_dataset=RE_valid_dataset,    # evaluation dataset
-        compute_metrics=compute_metrics   # define metrics function
-    )
+    optim = AdamW(model.parameters(), lr=args.lr)
 
-    # train model
-    trainer.train()
-    best_save_path = args.best_save_dir
-    model.save_pretrained(best_save_path)
-    tokenizer.save_pretrained(best_save_path)
+    wandb.log({
+        "model":args.model,
+        "seed":args.seed,
+        "epochs":args.epochs,
+        "batch_size":args.batch_size,
+        "optimizer":args.optimizer,
+        "lr":args.lr,
+        "val_ratio":args.val_ratio,
+    })
+
+    save_path = args.save_dir
+
+    best_eval_loss = 1e9
+    best_eval_f1 = 0
+
+    for epoch in range(args.epochs):
+        total_loss, total_idx = 0, 0
+        eval_total_loss, eval_total_idx = 0, 0
+        total_f1, total_auprc, total_acc = 0, 0, 0
+        eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0
+
+        model.train()
+        
+        for idx, batch in enumerate(tqdm(train_loader)):
+            total_idx += 1
+
+            optim.zero_grad()
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+            pred = outputs[1]
+            metric = compute_metrics(pred, labels)
+
+            loss = outputs[0]
+
+            total_loss += loss
+            total_f1 += metric['micro f1 score']
+            # total_auprc += metric['auprc']
+            total_acc += metric['accuracy']
+
+            average_loss = total_loss/total_idx
+            average_f1 = total_f1/total_idx
+            average_acc = total_acc/total_idx
+
+            wandb.log({
+                "epoch":epoch+1,
+                "train_loss":average_loss,
+                "train_f1":average_f1,
+                "train_acc":average_acc
+                })
+
+            if idx%args.logging_step == 0:
+                print(f"[TRAIN][EPOCH:({epoch + 1}/{args.epochs}) | loss:{average_loss:4.2f} | ", end="")
+                print(f"micro_f1_score:{average_f1:4.2f} | accuracy:{average_acc:4.2f}]")
+
+            loss.backward()
+            optim.step()
+        
+        model.save_pretrained(os.path.join(save_path, f"EPOCH-{epoch + 1}"))
+
+        with torch.no_grad():
+            model.eval()
+            print("--------------------------------------------------------------------------")
+            print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
+            for batch in tqdm(valid_loader):
+                eval_total_idx += 1
+
+                input_ids = batch['input_ids'].to(device)
+                attention_mask = batch['attention_mask'].to(device)
+                labels = batch['labels'].to(device)
+                outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+                pred = outputs[1]
+                eval_metric = compute_metrics(pred, labels)
+
+                loss = outputs[0]
+
+                eval_total_loss += loss
+                eval_total_f1 += eval_metric['micro f1 score']
+                eval_total_auprc += eval_metric['auprc']
+                eval_total_acc += eval_metric['accuracy']
+
+            eval_average_loss = eval_total_loss/eval_total_idx
+            eval_average_f1 = eval_total_f1/eval_total_idx
+            eval_average_acc = eval_total_acc/eval_total_idx
+
+            if eval_average_loss < best_eval_loss:
+                model.save_pretrained(os.path.join(save_path, "best_loss"))
+                best_eval_loss = eval_average_loss
+
+            if eval_average_f1 > best_eval_f1:
+                model.save_pretrained(os.path.join(save_path, "best_f1"))
+                best_eval_f1 = eval_average_f1
+
+            wandb.log({
+                "epoch":epoch+1,
+                "eval_loss":eval_average_loss,
+                "eval_f1":eval_average_f1,
+                "eval_acc":eval_average_acc
+                })
+
+            print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
+            print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
+
+        print("--------------------------------------------------------------------------")
+
+    tokenizer.save_pretrained(save_path)
     wandb.finish()
     
 def main(args):
@@ -178,20 +259,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="klue/bert-base")
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--logging_step', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--valid_batch_size', type=int, default=64)
-    parser.add_argument('--optimizer', type=str, default=None)
+    parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default="./results")
-    parser.add_argument('--best_save_dir', type=str, default="./best_model")
-    parser.add_argument('--tokenizer_dir', type=str, default='./tokenizer/')
-    parser.add_argument('--max_length', type=int, default=256)
-    parser.add_argument('--save_total_limit', type=int, default=5)
-    parser.add_argument('--report_name', type=str, default='mj')
-    parser.add_argument('--project_name', type=str, default="salt_v1")
+    parser.add_argument('--report_name', type=str)
+    parser.add_argument('--project_name', type=str, default="salt_v2")
+    parser.add_argument('--token_type', type=str, default="origin")
 
     args = parser.parse_args()
     main(args)
