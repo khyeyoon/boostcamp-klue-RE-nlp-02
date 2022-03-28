@@ -131,6 +131,8 @@ def train(args):
     # setting model hyperparameter
     model_config = AutoConfig.from_pretrained(MODEL_NAME)
     model_config.num_labels = 30
+    model_config.hidden_dropout_prob = args.dropout
+    model_config.attention_probs_dropout_prob = args.dropout
 
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
     model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
@@ -295,12 +297,13 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
-    parser.add_argument('--criterion', type=str, default="cross_entropy")
+    parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
     parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
     parser.add_argument('--wandb', type=str, default="True")
+    parser.add_argument('--dropout', type=float, default=0.1)
 
     args = parser.parse_args()
     main(args)
