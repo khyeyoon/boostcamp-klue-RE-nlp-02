@@ -202,14 +202,6 @@ def train(args):
             total_f1 += metric['micro f1 score']
             # total_auprc += metric['auprc']
             total_acc += metric['accuracy']
-
-            if not args.wandb == "False":
-                wandb.log({
-                    "epoch":epoch+1,
-                    "train_loss":average_loss,
-                    "train_f1":average_f1,
-                    "train_acc":average_acc
-                    })
                 
             average_loss = total_loss/(idx+1)
             average_f1 = total_f1/(idx+1)
@@ -273,6 +265,14 @@ def train(args):
                     print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
                 print("--------------------------------------------------------------------------")
+
+            if not args.wandb == "False":
+                wandb.log({
+                    "epoch":epoch+1,
+                    "train_loss":average_loss,
+                    "train_f1":average_f1,
+                    "train_acc":average_acc
+                    })
     
     if not args.wandb == "False":
         wandb.finish()
