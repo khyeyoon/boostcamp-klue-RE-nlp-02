@@ -65,6 +65,8 @@ def main(args):
     """
     주어진 dataset csv 파일과 같은 형태일 경우 inference 가능한 코드입니다.
     """
+    if not os.path.exists("./prediction"):
+        os.mkdir("./prediction")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # load tokenizer
     Tokenizer_NAME = os.path.join(args.model_dir, "..")
@@ -84,6 +86,7 @@ def main(args):
     with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
         model_config_parameters = json.load(f)
     #print(model_config_parameters)
+    
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
     test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, model_config_parameters['token_type'])
@@ -105,7 +108,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # model dir
-    parser.add_argument('--model_dir', type=str, default="./results/best_f1")
+    parser.add_argument('--model_dir', type=str, default="./results/best_loss")
     parser.add_argument('--submission_name', type=str, default="submission")
     parser.add_argument('--batch_size', type=int, default=64)
 
