@@ -169,12 +169,11 @@ def train(args):
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
+    total_idx = 0
 
     for epoch in range(args.epochs):
-        total_loss, total_idx = 0, 0
-        eval_total_loss, eval_total_idx = 0, 0
-        total_f1, total_auprc, total_acc = 0, 0, 0
-        eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0
+        total_f1, total_loss, total_acc = 0, 0, 0
+        average_loss, average_f1, average_acc = 0,0,0
 
         model.train()
         
@@ -198,16 +197,9 @@ def train(args):
             # total_auprc += metric['auprc']
             total_acc += metric['accuracy']
 
-            average_loss = total_loss/total_idx
-            average_f1 = total_f1/total_idx
-            average_acc = total_acc/total_idx
-
-            wandb.log({
-                "epoch":epoch+1,
-                "train_loss":average_loss,
-                "train_f1":average_f1,
-                "train_acc":average_acc
-                })
+            average_loss = total_loss/(idx+1)
+            average_f1 = total_f1/(idx+1)
+            average_acc = total_acc/(idx+1)
 
             if idx%args.logging_step == 0:
                 print(f"[TRAIN][EPOCH:({epoch + 1}/{args.epochs}) | loss:{average_loss:4.2f} | ", end="")
@@ -215,13 +207,12 @@ def train(args):
 
         
             if total_idx%args.eval_step == 0:
+                eval_total_loss, eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0, 0
                 with torch.no_grad():
                     model.eval()
                     print("--------------------------------------------------------------------------")
                     print(f"[EVAL] STEP:{total_idx}, BATCH SIZE:{args.batch_size}")
-                    # print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
-                    for batch in tqdm(valid_loader):
-                        eval_total_idx += 1
+                    for idx, batch in enumerate(tqdm(valid_loader)):
 
                         input_ids = batch['input_ids'].to(device)
                         attention_mask = batch['attention_mask'].to(device)
@@ -238,9 +229,10 @@ def train(args):
                         eval_total_auprc += eval_metric['auprc']
                         eval_total_acc += eval_metric['accuracy']
 
-                    eval_average_loss = eval_total_loss/eval_total_idx
-                    eval_average_f1 = eval_total_f1/eval_total_idx
-                    eval_average_acc = eval_total_acc/eval_total_idx
+                    eval_average_loss = eval_total_loss/len(valid_loader)
+                    eval_average_f1 = eval_total_f1/len(valid_loader)
+                    eval_total_auprc = eval_total_auprc/len(valid_loader)
+                    eval_average_acc = eval_total_acc/len(valid_loader)
 
                     if args.checkpoint:
                         model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
@@ -254,16 +246,23 @@ def train(args):
                         best_eval_f1 = eval_average_f1
 
                     wandb.log({
-                        "epoch":epoch+1,
+                        "step":total_idx,
                         "eval_loss":eval_average_loss,
                         "eval_f1":eval_average_f1,
                         "eval_acc":eval_average_acc
                         })
 
-                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
+                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
                     print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
                 print("--------------------------------------------------------------------------")
+
+        wandb.log({
+            "epoch":epoch+1,
+            "train_loss":average_loss,
+            "train_f1":average_f1,
+            "train_acc":average_acc
+            })
     
     wandb.finish()
     
