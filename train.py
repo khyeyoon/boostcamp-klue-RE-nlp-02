@@ -18,6 +18,7 @@ from load_data import *
 import argparse
 import wandb
 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 warnings.filterwarnings("ignore")
 
 def klue_re_micro_f1(preds, labels):
@@ -105,7 +106,7 @@ def train(args):
         'type_entity':["[ORG]","[/ORG]","[PER]","[/PER]","[POH]","[/POH]","[LOC]","[/LOC]","[DAT]","[/DAT]","[NOH]","[/NOH]"],
         'sub_obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
     }
-    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type)})    
+    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type, [])})    
 
     # load dataset
     dataset = load_data("../dataset/train/train.csv", token_type=args.token_type)
@@ -153,10 +154,17 @@ def train(args):
         "val_ratio":args.val_ratio,
     }
 
-    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
 
     with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
-        json.dump(model_config_parameters, indent=4)
+        json.dump(model_config_parameters, f, indent=4)
+    print(f"{save_path}에 model_config_parameter.json 파일 저장")
+
+    tokenizer.save_pretrained(save_path)
+    print(f"{save_path}에 tokenizer 저장")
+
+    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
@@ -251,8 +259,7 @@ def train(args):
             print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
         print("--------------------------------------------------------------------------")
-
-    tokenizer.save_pretrained(save_path)
+    
     wandb.finish()
     
 def main(args):
@@ -276,7 +283,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
-    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj
+    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
 
     args = parser.parse_args()
     main(args)
