@@ -84,11 +84,12 @@ def main(args):
     #print(model)
 
     with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
-        token_type = json.load(f)['token_type']
-
+        model_config_parameters = json.load(f)
+    #print(model_config_parameters)
+    
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, model_config_parameters['token_type'])
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
