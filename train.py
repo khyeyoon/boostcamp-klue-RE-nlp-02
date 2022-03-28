@@ -118,8 +118,8 @@ def train(args):
     valid_label = label_to_num(valid_dataset['label'].values)
 
     # tokenizing dataset
-    tokenized_train = tokenized_dataset(train_dataset, tokenizer)
-    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer)
+    tokenized_train = tokenized_dataset(train_dataset, tokenizer,sep_type=args.sep_type)
+    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer,sep_type=args.sep_type)
 
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
@@ -304,6 +304,7 @@ if __name__ == '__main__':
     parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
     parser.add_argument('--wandb', type=str, default="True")
     parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--sep_type', type=str, default='SEP')
 
     args = parser.parse_args()
     main(args)

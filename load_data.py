@@ -96,6 +96,8 @@ class Preprocessing_dataset:
         """entity를 위한 스페셜 토큰 추가해주는 전처리 함수"""
         subject_entity = []
         object_entity = []
+        sub_type_entity=[]
+        obj_type_entity=[]
         sentences = []
         for sentence, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             sub=self.String2dict(sub)
@@ -113,7 +115,11 @@ class Preprocessing_dataset:
             sentences.append(sentence)
             subject_entity.append(sub['word'])
             object_entity.append(obj['word'])
-        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+            sub_type_entity.append(sub['type'])
+            obj_type_entity.append(obj['type'])
+
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'sub_type_entity':sub_type_entity,'obj_type_entity':obj_type_entity})
+        
         return out_dataset
     
     def preprocessing_dataset_sub_obj(self, dataset):
@@ -198,13 +204,22 @@ def load_data(dataset_dir, token_type='origin'):
 
     return dataset
 
-def tokenized_dataset(dataset, tokenizer):
+def tokenized_dataset(dataset, tokenizer, sep_type='SEP'):
     """ tokenizer에 따라 sentence를 tokenizing 합니다."""
     concat_entity = []
-    for e01, e02 in zip(dataset['subject_entity'], dataset['object_entity']):
-        temp = ''
-        temp = e01 + '[SEP]' + e02
-        concat_entity.append(temp)
+    if sep_type.upper()=='SEP':
+        for e01, e02 in zip(dataset['subject_entity'], dataset['object_entity']):
+            temp = ''
+            temp = e01 + '[SEP]' + e02
+            concat_entity.append(temp)
+
+    elif sep_type.upper()=='ENT':
+        for e01, e02, sub, obj in zip(dataset['subject_entity'], dataset['object_entity'], dataset['sub_type_entity'], dataset['obj_type_entity']):
+            temp = ''
+            sub_token="["+sub+"]"+e01+"[/"+sub+"]"
+            obj_token="["+obj+"]"+e02+"[/"+obj+"]"
+            temp = sub_token + obj_token  
+            concat_entity.append(temp)
 
     tokenized_sentences = tokenizer(
         concat_entity,
