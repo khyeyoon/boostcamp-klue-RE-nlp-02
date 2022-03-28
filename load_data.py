@@ -99,7 +99,7 @@ class Preprocessing_dataset:
         sub_type_entity=[]
         obj_type_entity=[]
         sentences = []
-        for sentence, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
+        for sentence, sub, obj, in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             sub=self.String2dict(sub)
             obj=self.String2dict(obj)
 
@@ -118,7 +118,7 @@ class Preprocessing_dataset:
             sub_type_entity.append(sub['type'])
             obj_type_entity.append(obj['type'])
 
-        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'sub_type_entity':sub_type_entity,'obj_type_entity':obj_type_entity})
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'sub_type_entity':sub_type_entity,'obj_type_entity':obj_type_entity, 'label': dataset['label']})
         
         return out_dataset
     
