@@ -1,3 +1,5 @@
+import json
+from gevent import config
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import DataLoader
 from load_data import *
@@ -15,7 +17,7 @@ def inference(model, tokenized_sent, device):
     test dataset을 DataLoader로 만들어 준 후,
     batch_size로 나눠 model이 예측 합니다.
     """
-    dataloader = DataLoader(tokenized_sent, batch_size=16, shuffle=False)
+    dataloader = DataLoader(tokenized_sent, batch_size=64, shuffle=False)
     model.eval()
     output_pred = []
     output_prob = []
@@ -48,35 +50,48 @@ def num_to_label(label):
     
     return origin_label
 
-def load_test_dataset(dataset_dir, tokenizer):
+def load_test_dataset(dataset_dir, tokenizer, token_type, sep_type):
     """
     test dataset을 불러온 후,
     tokenizing 합니다.
     """
-    test_dataset = load_data(dataset_dir)
+    test_dataset = load_data(dataset_dir, token_type)
     test_label = list(map(int,test_dataset['label'].values))
     # tokenizing dataset
-    tokenized_test = tokenized_dataset(test_dataset, tokenizer)
+    tokenized_test = tokenized_dataset(test_dataset, tokenizer, sep_type)
     return test_dataset['id'], tokenized_test, test_label
 
 def main(args):
     """
     주어진 dataset csv 파일과 같은 형태일 경우 inference 가능한 코드입니다.
     """
+    if not os.path.exists("./prediction"):
+        os.mkdir("./prediction")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # load tokenizer
-    Tokenizer_NAME = "klue/bert-base"
+    Tokenizer_NAME = os.path.join(args.model_dir, "..")
+    # Tokenizer_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
+
+    print('tokenizer', tokenizer)
 
     ## load my model
     MODEL_NAME = args.model_dir # model dir.
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
     model.parameters
     model.to(device)
 
+    #print(model)
+
+    with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
+        model_config_parameters = json.load(f)
+        token_type = model_config_parameters['token_type']
+        sep_type = model_config_parameters['sep_type']
+    #print(model_config_parameters)
+    
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer)
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type, sep_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
@@ -88,14 +103,17 @@ def main(args):
     # 아래 directory와 columns의 형태는 지켜주시기 바랍니다.
     output = pd.DataFrame({'id':test_id,'pred_label':pred_answer,'probs':output_prob,})
 
-    output.to_csv('./prediction/submission.csv', index=False) # 최종적으로 완성된 예측한 라벨 csv 파일 형태로 저장.
+    output.to_csv('./prediction/' + args.submission_name + ".csv", index=False) # 최종적으로 완성된 예측한 라벨 csv 파일 형태로 저장.
     #### 필수!! ##############################################
     print('---- Finish! ----')
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # model dir
-    parser.add_argument('--model_dir', type=str, default="./best_model")
+    parser.add_argument('--model_dir', type=str, default="./results/best_loss")
+    parser.add_argument('--submission_name', type=str, default="submission")
+    parser.add_argument('--batch_size', type=int, default=64)
+
     args = parser.parse_args()
     print(args)
     main(args)
