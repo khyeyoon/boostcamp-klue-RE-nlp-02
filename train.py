@@ -191,7 +191,8 @@ def train(args):
             metric = compute_metrics(pred, labels)
 
             loss = outputs[0]
-
+            loss.backward()
+            optim.step()
             total_loss += loss
             total_f1 += metric['micro f1 score']
             # total_auprc += metric['auprc']
@@ -212,56 +213,57 @@ def train(args):
                 print(f"[TRAIN][EPOCH:({epoch + 1}/{args.epochs}) | loss:{average_loss:4.2f} | ", end="")
                 print(f"micro_f1_score:{average_f1:4.2f} | accuracy:{average_acc:4.2f}]")
 
-            loss.backward()
-            optim.step()
         
-        model.save_pretrained(os.path.join(save_path, f"EPOCH-{epoch + 1}"))
+            if total_idx%args.eval_step == 0:
+                with torch.no_grad():
+                    model.eval()
+                    print("--------------------------------------------------------------------------")
+                    print(f"[EVAL] STEP:{total_idx}, BATCH SIZE:{args.batch_size}")
+                    # print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
+                    for batch in tqdm(valid_loader):
+                        eval_total_idx += 1
 
-        with torch.no_grad():
-            model.eval()
-            print("--------------------------------------------------------------------------")
-            print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
-            for batch in tqdm(valid_loader):
-                eval_total_idx += 1
+                        input_ids = batch['input_ids'].to(device)
+                        attention_mask = batch['attention_mask'].to(device)
+                        token_type_ids =  batch['token_type_ids'].to(device)
+                        labels = batch['labels'].to(device)
+                        outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
+                        pred = outputs[1]
+                        eval_metric = compute_metrics(pred, labels)
 
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                token_type_ids =  batch['token_type_ids'].to(device)
-                labels = batch['labels'].to(device)
-                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
-                pred = outputs[1]
-                eval_metric = compute_metrics(pred, labels)
+                        loss = outputs[0]
 
-                loss = outputs[0]
+                        eval_total_loss += loss
+                        eval_total_f1 += eval_metric['micro f1 score']
+                        eval_total_auprc += eval_metric['auprc']
+                        eval_total_acc += eval_metric['accuracy']
 
-                eval_total_loss += loss
-                eval_total_f1 += eval_metric['micro f1 score']
-                eval_total_auprc += eval_metric['auprc']
-                eval_total_acc += eval_metric['accuracy']
+                    eval_average_loss = eval_total_loss/eval_total_idx
+                    eval_average_f1 = eval_total_f1/eval_total_idx
+                    eval_average_acc = eval_total_acc/eval_total_idx
 
-            eval_average_loss = eval_total_loss/eval_total_idx
-            eval_average_f1 = eval_total_f1/eval_total_idx
-            eval_average_acc = eval_total_acc/eval_total_idx
+                    if args.checkpoint:
+                        model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
 
-            if eval_average_loss < best_eval_loss:
-                model.save_pretrained(os.path.join(save_path, "best_loss"))
-                best_eval_loss = eval_average_loss
+                    if eval_average_loss < best_eval_loss:
+                        model.save_pretrained(os.path.join(save_path, "best_loss"))
+                        best_eval_loss = eval_average_loss
 
-            if eval_average_f1 > best_eval_f1:
-                model.save_pretrained(os.path.join(save_path, "best_f1"))
-                best_eval_f1 = eval_average_f1
+                    if eval_average_f1 > best_eval_f1:
+                        model.save_pretrained(os.path.join(save_path, "best_f1"))
+                        best_eval_f1 = eval_average_f1
 
-            wandb.log({
-                "epoch":epoch+1,
-                "eval_loss":eval_average_loss,
-                "eval_f1":eval_average_f1,
-                "eval_acc":eval_average_acc
-                })
+                    wandb.log({
+                        "epoch":epoch+1,
+                        "eval_loss":eval_average_loss,
+                        "eval_f1":eval_average_f1,
+                        "eval_acc":eval_average_acc
+                        })
 
-            print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
-            print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
+                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
+                    print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
-        print("--------------------------------------------------------------------------")
+                print("--------------------------------------------------------------------------")
     
     wandb.finish()
     
@@ -277,7 +279,9 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--logging_step', type=int, default=100)
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--eval_step', type=int, default=100)
+    parser.add_argument('--checkpoint', type=bool, default=False)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
