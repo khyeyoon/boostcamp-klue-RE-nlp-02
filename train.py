@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from loss import create_criterion
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from load_data import *
 
@@ -165,7 +166,8 @@ def train(args):
     tokenizer.save_pretrained(save_path)
     print(f"{save_path}에 tokenizer 저장")
 
-    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+    if not args.wandb == "False":
+        wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
@@ -189,7 +191,11 @@ def train(args):
             pred = outputs[1]
             metric = compute_metrics(pred, labels)
 
-            loss = outputs[0]
+            # loss = outputs[0]
+            criterion = create_criterion(args.criterion)
+
+            loss = criterion(pred, labels)
+
             loss.backward()
             optim.step()
             total_loss += loss
@@ -197,6 +203,14 @@ def train(args):
             # total_auprc += metric['auprc']
             total_acc += metric['accuracy']
 
+            if not args.wandb == "False":
+                wandb.log({
+                    "epoch":epoch+1,
+                    "train_loss":average_loss,
+                    "train_f1":average_f1,
+                    "train_acc":average_acc
+                    })
+                
             average_loss = total_loss/(idx+1)
             average_f1 = total_f1/(idx+1)
             average_acc = total_acc/(idx+1)
@@ -208,12 +222,13 @@ def train(args):
         
             if total_idx%args.eval_step == 0:
                 eval_total_loss, eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0, 0
+              
                 with torch.no_grad():
                     model.eval()
                     print("--------------------------------------------------------------------------")
                     print(f"[EVAL] STEP:{total_idx}, BATCH SIZE:{args.batch_size}")
+                    
                     for idx, batch in enumerate(tqdm(valid_loader)):
-
                         input_ids = batch['input_ids'].to(device)
                         attention_mask = batch['attention_mask'].to(device)
                         token_type_ids =  batch['token_type_ids'].to(device)
@@ -222,7 +237,8 @@ def train(args):
                         pred = outputs[1]
                         eval_metric = compute_metrics(pred, labels)
 
-                        loss = outputs[0]
+                        # loss = outputs[0]
+                        loss = criterion(pred, labels)
 
                         eval_total_loss += loss
                         eval_total_f1 += eval_metric['micro f1 score']
@@ -245,26 +261,21 @@ def train(args):
                         model.save_pretrained(os.path.join(save_path, "best_f1"))
                         best_eval_f1 = eval_average_f1
 
-                    wandb.log({
-                        "step":total_idx,
-                        "eval_loss":eval_average_loss,
-                        "eval_f1":eval_average_f1,
-                        "eval_acc":eval_average_acc
-                        })
+                    if not args.wandb == "False":
+                        wandb.log({
+                            "epoch":epoch+1,
+                            "eval_loss":eval_average_loss,
+                            "eval_f1":eval_average_f1,
+                            "eval_acc":eval_average_acc
+                            })
 
-                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
+                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
                     print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
                 print("--------------------------------------------------------------------------")
-
-        wandb.log({
-            "epoch":epoch+1,
-            "train_loss":average_loss,
-            "train_f1":average_f1,
-            "train_acc":average_acc
-            })
     
-    wandb.finish()
+    if not args.wandb == "False":
+        wandb.finish()
     
 def main(args):
     seed_everything(args.seed)
@@ -285,11 +296,12 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
-    parser.add_argument('--criterion', type=str, default=None)
+    parser.add_argument('--criterion', type=str, default="cross_entropy")
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
     parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
+    parser.add_argument('--wandb', type=bool, default=True)
 
     args = parser.parse_args()
     main(args)
