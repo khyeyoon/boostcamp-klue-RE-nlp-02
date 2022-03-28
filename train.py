@@ -176,8 +176,9 @@ def train(args):
             optim.zero_grad()
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
+            token_type_ids = batch['token_type_ids'].to(device)
             labels = batch['labels'].to(device)
-            outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+            outputs = model(input_ids, attention_mask=attention_mask, token_type_ids= token_type_ids, labels=labels)
             pred = outputs[1]
             metric = compute_metrics(pred, labels)
 
@@ -217,8 +218,9 @@ def train(args):
 
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
+                token_type_ids = batch['token_type_ids'].to(device)
                 labels = batch['labels'].to(device)
-                outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids = token_type_ids)
                 pred = outputs[1]
                 eval_metric = compute_metrics(pred, labels)
 
