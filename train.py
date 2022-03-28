@@ -157,6 +157,7 @@ def train(args):
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
+    os.makedirs(save_path, exist_ok=True)
     with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
         json.dump(model_config_parameters, f, indent=4)
     print(f"{save_path}에 model_config_parameter.json 파일 저장")
@@ -183,8 +184,9 @@ def train(args):
             optim.zero_grad()
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
+            token_type_ids =  batch['token_type_ids'].to(device)
             labels = batch['labels'].to(device)
-            outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels,token_type_ids=token_type_ids)
             pred = outputs[1]
             metric = compute_metrics(pred, labels)
 
@@ -224,8 +226,9 @@ def train(args):
 
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
+                token_type_ids =  batch['token_type_ids'].to(device)
                 labels = batch['labels'].to(device)
-                outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
                 pred = outputs[1]
                 eval_metric = compute_metrics(pred, labels)
 
