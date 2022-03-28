@@ -156,6 +156,7 @@ def train(args):
         "optimizer":args.optimizer,
         "lr":args.lr,
         "val_ratio":args.val_ratio,
+        "sep_type":args.sep_type
     }
 
     if not os.path.exists(save_path):

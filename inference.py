@@ -50,7 +50,7 @@ def num_to_label(label):
     
     return origin_label
 
-def load_test_dataset(dataset_dir, tokenizer, token_type):
+def load_test_dataset(dataset_dir, tokenizer, token_type, sep_type):
     """
     test dataset을 불러온 후,
     tokenizing 합니다.
@@ -58,7 +58,7 @@ def load_test_dataset(dataset_dir, tokenizer, token_type):
     test_dataset = load_data(dataset_dir, token_type)
     test_label = list(map(int,test_dataset['label'].values))
     # tokenizing dataset
-    tokenized_test = tokenized_dataset(test_dataset, tokenizer)
+    tokenized_test = tokenized_dataset(test_dataset, tokenizer, sep_type)
     return test_dataset['id'], tokenized_test, test_label
 
 def main(args):
@@ -85,11 +85,13 @@ def main(args):
 
     with open(os.path.join(args.model_dir, "..", "model_config_parameters.json"), 'r') as f:
         model_config_parameters = json.load(f)
+        token_type = model_config_parameters['token_type']
+        sep_type = model_config_parameters['sep_type']
     #print(model_config_parameters)
     
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
-    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, model_config_parameters['token_type'])
+    test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type, sep_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
 
     ## predict answer
