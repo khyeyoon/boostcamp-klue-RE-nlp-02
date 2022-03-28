@@ -141,6 +141,7 @@ def train(args):
     valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
 
     optim = AdamW(model.parameters(), lr=args.lr)
+    criterion = create_criterion(args.criterion)
 
     save_path = args.save_dir
 
@@ -166,12 +167,14 @@ def train(args):
     tokenizer.save_pretrained(save_path)
     print(f"{save_path}에 tokenizer 저장")
 
-    if not args.wandb == "False":
+    if args.wandb == "True":
         wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
     total_idx = 0
+
 
     for epoch in range(args.epochs):
         total_f1, total_loss, total_acc = 0, 0, 0
@@ -192,8 +195,6 @@ def train(args):
             metric = compute_metrics(pred, labels)
 
             # loss = outputs[0]
-            criterion = create_criterion(args.criterion)
-
             loss = criterion(pred, labels)
 
             loss.backward()
@@ -202,7 +203,7 @@ def train(args):
             total_f1 += metric['micro f1 score']
             # total_auprc += metric['auprc']
             total_acc += metric['accuracy']
-                
+
             average_loss = total_loss/(idx+1)
             average_f1 = total_f1/(idx+1)
             average_acc = total_acc/(idx+1)
@@ -214,13 +215,12 @@ def train(args):
         
             if total_idx%args.eval_step == 0:
                 eval_total_loss, eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0, 0
-              
                 with torch.no_grad():
                     model.eval()
                     print("--------------------------------------------------------------------------")
                     print(f"[EVAL] STEP:{total_idx}, BATCH SIZE:{args.batch_size}")
-                    
                     for idx, batch in enumerate(tqdm(valid_loader)):
+
                         input_ids = batch['input_ids'].to(device)
                         attention_mask = batch['attention_mask'].to(device)
                         token_type_ids =  batch['token_type_ids'].to(device)
@@ -253,28 +253,27 @@ def train(args):
                         model.save_pretrained(os.path.join(save_path, "best_f1"))
                         best_eval_f1 = eval_average_f1
 
-                    if not args.wandb == "False":
+                    if args.wandb == "True":
                         wandb.log({
-                            "epoch":epoch+1,
+                            "step":total_idx,
                             "eval_loss":eval_average_loss,
                             "eval_f1":eval_average_f1,
                             "eval_acc":eval_average_acc
                             })
 
-                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
+                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
                     print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
                 print("--------------------------------------------------------------------------")
-
-            if not args.wandb == "False":
-                wandb.log({
-                    "epoch":epoch+1,
-                    "train_loss":average_loss,
-                    "train_f1":average_f1,
-                    "train_acc":average_acc
-                    })
+        if args.wandb == "True":
+            wandb.log({
+                "epoch":epoch+1,
+                "train_loss":average_loss,
+                "train_f1":average_f1,
+                "train_acc":average_acc
+                })
     
-    if not args.wandb == "False":
+    if args.wandb == "True":
         wandb.finish()
     
 def main(args):
@@ -301,7 +300,7 @@ if __name__ == '__main__':
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
     parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
-    parser.add_argument('--wandb', type=bool, default=True)
+    parser.add_argument('--wandb', type=str, default="True")
 
     args = parser.parse_args()
     main(args)
