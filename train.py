@@ -189,9 +189,15 @@ def train(args):
     best_eval_f1 = 0
     total_idx = 0
 
+    schedule_idx = 1
     for epoch in range(args.epochs):
         total_f1, total_loss, total_acc = 0, 0, 0
         average_loss, average_f1, average_acc = 0,0,0
+
+        # LR scheduler
+        if epoch > 1 and epoch % 2 == 0:
+            schedule_idx *= 2
+            optim = AdamW(model.parameters(), lr=args.lr / 2)
         
         for idx, batch in enumerate(tqdm(train_loader)):
             model.train()
