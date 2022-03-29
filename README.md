@@ -73,11 +73,11 @@ dict_num_to_label.pkl: Dict[int:str]
         - 'type_entity'         :   [PER]이순신[/PER]은 조선 중기의 [POH]무신[/POH]이다.
         - 'sub_obj'             :   [SUB]이순신[/SUB]은 조선 중기의 [OBJ]무신[/OBJ]이다.
         - 'special_entity'      :   @ 이순신 @ 은 조선 중기의 # 무신 # 이다.
-        - 'special_type_entity' :   @ * person * 이순신 @ 은 조선 중기의 # ^ position ^ 무신 # 이다.
+        - 'special_type_entity' :   @ * 사람 * 이순신 @ 은 조선 중기의 # ^ 지위 ^ 무신 # 이다.
         
         
     --sep_type은 input으로 들어오는 entity를 [SEP] token으로 나눌지 entity token으로 나눌지에 대한 옵션입니다.
         Should be one of
         - 'SEP' : [CLS]이순신[SEP]무신[SEP]이순신은 조선 중기의 무신이다.
-        - 'ENT' : [CLS][PER]이순신[/PER][POH]무신[/POH]이순신은 조선 중기의 무신이다.
+        - 'ENT' : [CLS][PER]이순신[/PER][POH]무신[/POH][SEP]이순신은 조선 중기의 무신이다.
    
