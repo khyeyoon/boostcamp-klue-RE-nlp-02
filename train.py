@@ -12,12 +12,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
-from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
+from loss import create_criterion
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer, AutoModel
 from load_data import *
+from tune_models import *
 
 import argparse
 import wandb
 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 warnings.filterwarnings("ignore")
 
 def klue_re_micro_f1(preds, labels):
@@ -105,7 +108,7 @@ def train(args):
         'type_entity':["[ORG]","[/ORG]","[PER]","[/PER]","[POH]","[/POH]","[LOC]","[/LOC]","[DAT]","[/DAT]","[NOH]","[/NOH]"],
         'sub_obj':['[SUB_ENT]','[/SUB_ENT]','[OBJ_ENT]','[/OBJ_ENT]']
     }
-    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type)})    
+    num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(args.token_type, [])})    
 
     # load dataset
     dataset = load_data("../dataset/train/train.csv", token_type=args.token_type)
@@ -116,8 +119,8 @@ def train(args):
     valid_label = label_to_num(valid_dataset['label'].values)
 
     # tokenizing dataset
-    tokenized_train = tokenized_dataset(train_dataset, tokenizer)
-    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer)
+    tokenized_train = tokenized_dataset(train_dataset, tokenizer,sep_type=args.sep_type)
+    tokenized_valid = tokenized_dataset(valid_dataset, tokenizer,sep_type=args.sep_type)
 
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
@@ -129,16 +132,42 @@ def train(args):
     # setting model hyperparameter
     model_config = AutoConfig.from_pretrained(MODEL_NAME)
     model_config.num_labels = 30
+    model_config.hidden_dropout_prob = args.dropout
+    model_config.attention_probs_dropout_prob = args.dropout
 
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
-    model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
-    print(model.config)
+    # model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, config=model_config)
+    # model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
+    # print(model.config)
+    # model.to(device)
+    ###############################################
+    b_model = AutoModel.from_pretrained(MODEL_NAME, config= model_config)
+    b_model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
+    model = TunedModelLSTM(b_model, 30, device)
+
+    #print(model.config)
     model.to(device)
+    ################################################
     
     train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
     valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
 
-    optim = AdamW(model.parameters(), lr=args.lr)
+    optim = AdamW([
+        #{'params' : model.parameters(), 'lr':args.lr},
+                    {'params' : model.base_model.parameters(), 'lr':args.lr},
+                    {'params':model.linear.parameters(), 'lr':args.lr},
+                    {'params' : model.rnn.parameters(), 'lr' : 0.0001},
+                    {'params' : model.rnn_lin.parameters(), 'lr' : 0.001},
+                    ])
+
+    for param_group in optim.param_groups:
+        print(param_group['lr'])
+
+    # optim = AdamW([{'params': model.BERT.parameters(), 'lr':args.lr}, 
+    #                 {'params':model.cls_classifier.parameters(), 'lr':args.lr},
+    #                 {'params':model.fc.parameters(), 'lr':args.lr},
+    #                 {'params': model.LSTM.parameters(), 'lr': 0.001}])
+
+    criterion = create_criterion(args.criterion)
 
     save_path = args.save_dir
 
@@ -151,113 +180,135 @@ def train(args):
         "optimizer":args.optimizer,
         "lr":args.lr,
         "val_ratio":args.val_ratio,
+        "sep_type":args.sep_type
     }
 
-    wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
 
     os.makedirs(save_path, exist_ok=True)
     with open(os.path.join(save_path, "model_config_parameters.json"), 'w') as f:
         json.dump(model_config_parameters, f, indent=4)
+    print(f"{save_path}에 model_config_parameter.json 파일 저장")
+
+    tokenizer.save_pretrained(save_path)
+    print(f"{save_path}에 tokenizer 저장")
+
+    if args.wandb == "True":
+        wandb.init(project=args.project_name, entity="salt-bread", name=args.report_name, config=model_config_parameters)
+
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
+    total_idx = 0
+
 
     for epoch in range(args.epochs):
-        total_loss, total_idx = 0, 0
-        eval_total_loss, eval_total_idx = 0, 0
-        total_f1, total_auprc, total_acc = 0, 0, 0
-        eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0
-
-        model.train()
+        total_f1, total_loss, total_acc = 0, 0, 0
+        average_loss, average_f1, average_acc = 0,0,0
+        #model.train()
         
         for idx, batch in enumerate(tqdm(train_loader)):
+            model.train()
             total_idx += 1
 
             optim.zero_grad()
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
-            token_type_ids = batch['token_type_ids'].to(device)
+            token_type_ids =  batch['token_type_ids'].to(device)
             labels = batch['labels'].to(device)
-            outputs = model(input_ids, attention_mask=attention_mask, token_type_ids= token_type_ids, labels=labels)
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels,token_type_ids=token_type_ids)
             pred = outputs[1]
             metric = compute_metrics(pred, labels)
 
-            loss = outputs[0]
+            # loss = outputs[0]
+            loss = criterion(pred, labels)
 
+            loss.backward()
+            optim.step()
             total_loss += loss
             total_f1 += metric['micro f1 score']
             # total_auprc += metric['auprc']
             total_acc += metric['accuracy']
 
-            average_loss = total_loss/total_idx
-            average_f1 = total_f1/total_idx
-            average_acc = total_acc/total_idx
+            average_loss = total_loss/(idx+1)
+            average_f1 = total_f1/(idx+1)
+            average_acc = total_acc/(idx+1)
 
+            if idx%args.logging_step == 0:
+                print(f"[TRAIN][EPOCH:({epoch + 1}/{args.epochs}) | loss:{average_loss:4.2f} | ", end="")
+                print(f"micro_f1_score:{average_f1:4.2f} | accuracy:{average_acc:4.2f}]")
+
+        
+            if total_idx%args.eval_step == 0:
+                eval_total_loss, eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0, 0
+                with torch.no_grad():
+                    model.eval()
+                    print("--------------------------------------------------------------------------")
+                    print(f"[EVAL] STEP:{total_idx}, BATCH SIZE:{args.batch_size}")
+                    for idx, batch in enumerate(tqdm(valid_loader)):
+
+                        input_ids = batch['input_ids'].to(device)
+                        attention_mask = batch['attention_mask'].to(device)
+                        token_type_ids =  batch['token_type_ids'].to(device)
+                        labels = batch['labels'].to(device)
+                        outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
+                        pred = outputs[1]
+                        eval_metric = compute_metrics(pred, labels)
+
+                        # loss = outputs[0]
+                        loss = criterion(pred, labels)
+
+                        eval_total_loss += loss
+                        eval_total_f1 += eval_metric['micro f1 score']
+                        eval_total_auprc += eval_metric['auprc']
+                        eval_total_acc += eval_metric['accuracy']
+
+                    eval_average_loss = eval_total_loss/len(valid_loader)
+                    eval_average_f1 = eval_total_f1/len(valid_loader)
+                    eval_total_auprc = eval_total_auprc/len(valid_loader)
+                    eval_average_acc = eval_total_acc/len(valid_loader)
+
+                    if args.checkpoint:
+                        #model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
+                        os.makedirs( os.path.join(save_path, f"checkpoint-{total_idx}") , exist_ok=True)
+                        torch.save(model, os.path.join(save_path, f"checkpoint-{total_idx}", "model.bin"))
+
+                    if eval_average_loss < best_eval_loss:
+                        #model.save_pretrained(os.path.join(save_path, "best_loss"))
+                        os.makedirs( os.path.join(save_path, "best_loss") , exist_ok=True)
+                        torch.save(model, os.path.join(save_path, "best_loss", "model.bin"))
+                        best_eval_loss = eval_average_loss
+
+                    if eval_average_f1 > best_eval_f1:
+                        #model.save_pretrained(os.path.join(save_path, "best_f1"))
+                        os.makedirs( os.path.join(save_path, "best_f1") , exist_ok=True)
+                        torch.save(model, os.path.join(save_path, "best_f1", "model.bin"))
+                        best_eval_f1 = eval_average_f1
+
+                    if args.wandb == "True":
+                        wandb.log({
+                            "step":total_idx,
+                            "eval_loss":eval_average_loss,
+                            "eval_f1":eval_average_f1,
+                            "eval_acc":eval_average_acc
+                            })
+
+                    print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
+                    print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
+
+                print("--------------------------------------------------------------------------")
+        if args.wandb == "True":
             wandb.log({
                 "epoch":epoch+1,
                 "train_loss":average_loss,
                 "train_f1":average_f1,
                 "train_acc":average_acc
                 })
-
-            if idx%args.logging_step == 0:
-                print(f"[TRAIN][EPOCH:({epoch + 1}/{args.epochs}) | loss:{average_loss:4.2f} | ", end="")
-                print(f"micro_f1_score:{average_f1:4.2f} | accuracy:{average_acc:4.2f}]")
-
-            loss.backward()
-            optim.step()
-        
-        model.save_pretrained(os.path.join(save_path, f"EPOCH-{epoch + 1}"))
-
-        with torch.no_grad():
-            model.eval()
-            print("--------------------------------------------------------------------------")
-            print(f"[EVALUATION] EPOCH:({epoch + 1}/{args.epochs})")
-            for batch in tqdm(valid_loader):
-                eval_total_idx += 1
-
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                token_type_ids = batch['token_type_ids'].to(device)
-                labels = batch['labels'].to(device)
-                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids = token_type_ids)
-                pred = outputs[1]
-                eval_metric = compute_metrics(pred, labels)
-
-                loss = outputs[0]
-
-                eval_total_loss += loss
-                eval_total_f1 += eval_metric['micro f1 score']
-                eval_total_auprc += eval_metric['auprc']
-                eval_total_acc += eval_metric['accuracy']
-
-            eval_average_loss = eval_total_loss/eval_total_idx
-            eval_average_f1 = eval_total_f1/eval_total_idx
-            eval_average_acc = eval_total_acc/eval_total_idx
-
-            if eval_average_loss < best_eval_loss:
-                model.save_pretrained(os.path.join(save_path, "best_loss"))
-                best_eval_loss = eval_average_loss
-
-            if eval_average_f1 > best_eval_f1:
-                model.save_pretrained(os.path.join(save_path, "best_f1"))
-                best_eval_f1 = eval_average_f1
-
-            wandb.log({
-                "epoch":epoch+1,
-                "eval_loss":eval_average_loss,
-                "eval_f1":eval_average_f1,
-                "eval_acc":eval_average_acc
-                })
-
-            print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc/eval_total_idx:4.2f} | ", end="")
-            print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
-
-        print("--------------------------------------------------------------------------")
-
-    tokenizer.save_pretrained(save_path)
-    wandb.finish()
     
+    if args.wandb == "True":
+        wandb.finish()
+
 def main(args):
     seed_everything(args.seed)
     train(args)
@@ -270,16 +321,21 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--logging_step', type=int, default=100)
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--eval_step', type=int, default=100)
+    parser.add_argument('--checkpoint', type=bool, default=False)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
-    parser.add_argument('--criterion', type=str, default=None)
+    parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
-    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj
+    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
+    parser.add_argument('--wandb', type=str, default="True")
+    parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--sep_type', type=str, default='SEP')
 
     args = parser.parse_args()
     main(args)

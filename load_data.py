@@ -23,23 +23,36 @@ class Preprocessing_dataset:
     def __init__(self, dataset, token_type="origin"):
         self.dataset=dataset
         self.token_type=token_type
+        self.dict_type_to_str = {
+            "PER":"person",
+            "ORG":"organization",
+            "POH":"position",
+            "LOC":"location",
+            "DAT":"date",
+            "NOH":"number"
+        }
         
     def return_dataset(self):        
         if self.token_type=='entity':
-            return self.preprocessing_dataset_v1(self.dataset)
+            return self.preprocessing_dataset_entity(self.dataset)
         elif self.token_type=='type_entity':
-            return self.preprocessing_dataset_v2(self.dataset)
+            return self.preprocessing_dataset_type_entity(self.dataset)
         elif self.token_type=='sub_obj':
-            return self.preprocessing_dataset_v3(self.dataset)
+            return self.preprocessing_dataset_sub_obj(self.dataset)
+        elif self.token_type=='special_entity':
+            return self.preprocessing_dataset_special_entity(self.dataset)
+        elif self.token_type=='special_type_entity':
+            return self.preprocessing_dataset_special_type_entity(self.dataset)
         else:
+            if not self.token_type=='origin':
+                print(f"{self.token_type}에 해당하는 token_type이 없어 origin으로 Preprocessing 합니다.")
             return self.preprocessing_dataset(self.dataset)
         
-    def preprocessing_dataset_v1(self,dataset):
+    def preprocessing_dataset_entity(self,dataset):
         sentences = []
         subject_entity = []
         object_entity = []
         entity_start_token, entity_end_token = "[ENT]", "[/ENT]"
-        # word_indices = []
 
         for sentence, subject, object in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             subject_word = subject.split(",")[0].split(":")[1].strip()
@@ -62,22 +75,8 @@ class Preprocessing_dataset:
             subject_entity.append(subject_word)
             object_entity.append(object_word)
             sentences.append(sentence)
-            # word_indices.append(sorted(indices, reverse=True))
-
 
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
-        return out_dataset
-
-    def preprocessing_dataset(self,dataset):
-        subject_entity = []
-        object_entity = []
-        for i,j in zip(dataset['subject_entity'], dataset['object_entity']):
-            i = i[1:-1].split(',')[0].split(':')[1][2:-1]
-            j = j[1:-1].split(',')[0].split(':')[1][2:-1]
-
-            subject_entity.append(i)
-            object_entity.append(j)
-        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':dataset['sentence'],'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
 
     def String2dict(self,string):
@@ -93,12 +92,14 @@ class Preprocessing_dataset:
 
         return entity_dict
 
-    def preprocessing_dataset_v2(self,dataset):
+    def preprocessing_dataset_type_entity(self,dataset):
         """entity를 위한 스페셜 토큰 추가해주는 전처리 함수"""
         subject_entity = []
         object_entity = []
+        sub_type_entity=[]
+        obj_type_entity=[]
         sentences = []
-        for sentence, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
+        for sentence, sub, obj, in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             sub=self.String2dict(sub)
             obj=self.String2dict(obj)
 
@@ -114,10 +115,14 @@ class Preprocessing_dataset:
             sentences.append(sentence)
             subject_entity.append(sub['word'])
             object_entity.append(obj['word'])
-        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+            sub_type_entity.append(sub['type'])
+            obj_type_entity.append(obj['type'])
+
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':sentences,'subject_entity':subject_entity,'object_entity':object_entity,'sub_type_entity':sub_type_entity,'obj_type_entity':obj_type_entity, 'label': dataset['label']})
+        
         return out_dataset
     
-    def preprocessing_dataset_v3(self, dataset):
+    def preprocessing_dataset_sub_obj(self, dataset):
         pre_sentence = []
         subject_entity = []
         object_entity = []
@@ -133,6 +138,54 @@ class Preprocessing_dataset:
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':pre_sentence,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
 
+    def preprocessing_dataset_special_entity(self, dataset):
+        pre_sentence = []
+        subject_entity = []
+        object_entity = []
+        for s,i,j in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
+            i = i[1:-1].split(',')[0].split(':')[1][2:-1]
+            j = j[1:-1].split(',')[0].split(':')[1][2:-1]
+            s = re.sub(i, ' @ '+i+' @ ', s)
+            s = re.sub(j, ' # '+j+' # ', s)
+
+            subject_entity.append(i)
+            object_entity.append(j)
+            pre_sentence.append(s)
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':pre_sentence,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+        return out_dataset
+
+    def preprocessing_dataset_special_type_entity(self, dataset):
+        pre_sentence = []
+        subject_entity = []
+        object_entity = []
+        for s, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
+            sub_entity = sub[1:-1].split(',')[0].split(':')[1][2:-1]
+            obj_entity = obj[1:-1].split(',')[0].split(':')[1][2:-1]
+            sub_type = self.dict_type_to_str[sub[1:-1].split(',')[-1].split(':')[1].strip().replace("'", "")]
+            obj_type = self.dict_type_to_str[obj[1:-1].split(',')[-1].split(':')[1].strip().replace("'", "")]
+
+            s = re.sub(sub, ' @ * ' + sub_type + ' * ' + sub_entity + ' @ ', s)
+            s = re.sub(obj, ' # ^ ' + obj_type + ' ^ ' + obj_entity + ' # ', s)
+
+            subject_entity.append(sub)
+            object_entity.append(obj)
+            pre_sentence.append(s)
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':pre_sentence,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+        return out_dataset
+
+
+    def preprocessing_dataset(self, dataset):
+        subject_entity = []
+        object_entity = []
+        for i,j in zip(dataset['subject_entity'], dataset['object_entity']):
+            i = i[1:-1].split(',')[0].split(':')[1][2:-1]
+            j = j[1:-1].split(',')[0].split(':')[1][2:-1]
+
+            subject_entity.append(i)
+            object_entity.append(j)
+        out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':dataset['sentence'],'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
+        return out_dataset
+
 def load_data(dataset_dir, token_type='origin'):
     """
     Arguments:
@@ -141,22 +194,32 @@ def load_data(dataset_dir, token_type='origin'):
             Should be one of
             - 'origin' : entity token 추가하지 않음
             - 'entity' : [ENT], [/ENT] token 추가
-            - 'type_entity' : word type 별로 token 추가
-            - 'sub_obj' : subject와 object 별개로 token 추가
+            - 'type_entity' : word type으로 token 추가
+            - 'sub_obj' : subject와 object 각각 token 추가
+            - 'special_entity' : @, #으로 token 추가
     """
     pd_dataset = pd.read_csv(dataset_dir)
     dataset = Preprocessing_dataset(pd_dataset,token_type).return_dataset()
-    print("preprocessing finished")
+    print(f"{token_type} preprocessing finished")
 
     return dataset
 
-def tokenized_dataset(dataset, tokenizer):
+def tokenized_dataset(dataset, tokenizer, sep_type='SEP'):
     """ tokenizer에 따라 sentence를 tokenizing 합니다."""
     concat_entity = []
-    for e01, e02 in zip(dataset['subject_entity'], dataset['object_entity']):
-        temp = ''
-        temp = e01 + '[SEP]' + e02
-        concat_entity.append(temp)
+    if sep_type.upper()=='SEP':
+        for e01, e02 in zip(dataset['subject_entity'], dataset['object_entity']):
+            temp = ''
+            temp = e01 + '[SEP]' + e02
+            concat_entity.append(temp)
+
+    elif sep_type.upper()=='ENT':
+        for e01, e02, sub, obj in zip(dataset['subject_entity'], dataset['object_entity'], dataset['sub_type_entity'], dataset['obj_type_entity']):
+            temp = ''
+            sub_token="["+sub+"]"+e01+"[/"+sub+"]"
+            obj_token="["+obj+"]"+e02+"[/"+obj+"]"
+            temp = sub_token + obj_token  
+            concat_entity.append(temp)
 
     tokenized_sentences = tokenizer(
         concat_entity,
