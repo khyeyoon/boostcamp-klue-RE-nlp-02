@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+# from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 from loss import create_criterion
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from load_data import *
@@ -98,6 +99,10 @@ def seed_everything(seed):
     random.seed(seed)
 
 def train(args):
+    # get random number to choose example sentence
+    data_idx = random.randint(0, 100)
+    # hold seeds
+    seed_everything(args.seed)
     # load model and tokenizer
     MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -124,9 +129,9 @@ def train(args):
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
     RE_valid_dataset = RE_Dataset(tokenized_valid, valid_label)
+    print("[dataset 예시]", tokenizer.decode(RE_train_dataset[data_idx]['input_ids']), sep='\n')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
     print(device)
     # setting model hyperparameter
     model_config = AutoConfig.from_pretrained(MODEL_NAME)
@@ -144,6 +149,12 @@ def train(args):
 
     optim = AdamW(model.parameters(), lr=args.lr)
     criterion = create_criterion(args.criterion)
+    # scheduler: torch.optim
+    # if args.lr_scheduler == "StepLR":
+    #     scheduler = StepLR(optim, 20, gamma=0.5)
+    # elif args.lr_scheduler == "ReduceLROnPlateau":
+    #     scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
+
 
     save_path = args.save_dir
 
@@ -178,14 +189,12 @@ def train(args):
     best_eval_f1 = 0
     total_idx = 0
 
-
     for epoch in range(args.epochs):
         total_f1, total_loss, total_acc = 0, 0, 0
         average_loss, average_f1, average_acc = 0,0,0
-
-        model.train()
         
         for idx, batch in enumerate(tqdm(train_loader)):
+            model.train()
             total_idx += 1
 
             optim.zero_grad()
@@ -273,14 +282,22 @@ def train(args):
                 "epoch":epoch+1,
                 "train_loss":average_loss,
                 "train_f1":average_f1,
-                "train_acc":average_acc
+                "train_acc":average_acc,
+                "learning_rate": optim.param_groups[0]['lr']
                 })
+        # if args.lr_scheduler == 'ReduceLROnPlateau':
+        #     scheduler.step(eval_average_loss)
+        #     print('LR:', optim.param_groups[0]['lr'])
+        # elif args.lr_scheduler == 'StepLR':
+        #     scheduler.step()
+        #     print('LR:', optim.param_groups[0]['lr'])
+
     
     if args.wandb == "True":
         wandb.finish()
-    
+
+
 def main(args):
-    seed_everything(args.seed)
     train(args)
 
 if __name__ == '__main__':
