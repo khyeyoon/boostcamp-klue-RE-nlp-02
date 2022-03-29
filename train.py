@@ -153,12 +153,18 @@ def train(args):
 
     best_eval_loss = 1e9
     best_eval_f1 = 0
+    total_idx = 0
 
+    lr_num = 1
     for epoch in range(args.epochs):
         total_loss, total_idx = 0, 0
         eval_total_loss, eval_total_idx = 0, 0
         total_f1, total_auprc, total_acc = 0, 0, 0
         eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0
+
+        if epoch > 1 and epoch % 2 == 0:
+            lr_num *= 2
+        optim = AdamW(model.parameters(), lr=args.lr / lr_num)
 
         model.train()
         
