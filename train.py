@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.optim import AdamW
 # from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 from loss import create_criterion
+from scheduler import create_lr_scheduler
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from load_data import *
 
@@ -149,10 +150,12 @@ def train(args):
 
     optim = AdamW(model.parameters(), lr=args.lr)
     criterion = create_criterion(args.criterion)
-    # scheduler: torch.optim
-    # if args.lr_scheduler == "StepLR":
+
+    if args.lr_scheduler:
+        lr_scheduler = create_lr_scheduler(args.lr_scheduler)
+        scheduler = lr_scheduler(optim)
+
     #     scheduler = StepLR(optim, 20, gamma=0.5)
-    # elif args.lr_scheduler == "ReduceLROnPlateau":
     #     scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
 
 
@@ -291,12 +294,13 @@ def train(args):
                 "train_acc":average_acc,
                 "learning_rate": optim.param_groups[0]['lr']
                 })
-        # if args.lr_scheduler == 'ReduceLROnPlateau':
-        #     scheduler.step(eval_average_loss)
-        #     print('LR:', optim.param_groups[0]['lr'])
-        # elif args.lr_scheduler == 'StepLR':
-        #     scheduler.step()
-        #     print('LR:', optim.param_groups[0]['lr'])
+        
+        if args.lr_scheduler:
+            scheduler.step()
+            # if args.lr_scheduler == 'ReduceLROnPlateau':
+            #     scheduler.step(eval_average_loss)
+            # elif args.lr_scheduler == 'StepLR':
+            #     scheduler.step()
 
     
     if args.wandb == "True":
@@ -325,10 +329,11 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
     parser.add_argument('--project_name', type=str, default="salt_v2")
-    parser.add_argument('--token_type', type=str, default="origin") # origin, entity, type_entity, sub_obj, special_entity
+    parser.add_argument('--token_type', type=str, default="origin") # 'origin', 'entity', 'type_entity', 'sub_obj', 'special_entity'
     parser.add_argument('--wandb', type=str, default="True")
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--sep_type', type=str, default='SEP')
-
+    parser.add_argument('--sep_type', type=str, default='SEP') # SEP, ENT
+    parser.add_argument('--lr_scheduler', type=str) # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
+    
     args = parser.parse_args()
     main(args)
