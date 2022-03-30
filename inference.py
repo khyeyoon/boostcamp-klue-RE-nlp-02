@@ -99,7 +99,7 @@ def main(args):
     test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type, sep_type)
     Re_test_dataset = RE_Dataset(test_dataset ,test_label)
     # get random number to choose example sentence
-    data_idx = random.randint(0, 100)
+    data_idx = np.random.randint(0, 100)
     print("[dataset 예시]", tokenizer.decode(Re_test_dataset[data_idx]['input_ids']), sep='\n')
 
     ## predict answer
