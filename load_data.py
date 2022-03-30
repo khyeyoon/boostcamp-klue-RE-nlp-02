@@ -200,7 +200,7 @@ def load_data(dataset_dir, token_type='origin', is_relation=False):
     """
     if is_relation:
         pd_dataset = pd.read_csv(dataset_dir)
-        pd_dataset = pd_dataset[pd_dataset.label == 'no_relation']
+        pd_dataset = pd_dataset[pd_dataset.label != 'no_relation']
     else:
         pd_dataset = pd.read_csv(dataset_dir)
 
