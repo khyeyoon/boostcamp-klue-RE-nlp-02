@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 from loss import create_criterion
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer, AutoModel
 from load_data import *
@@ -99,6 +100,10 @@ def seed_everything(seed):
     random.seed(seed)
 
 def train(args):
+    # get random number to choose example sentence
+    data_idx = random.randint(0, 100)
+    # hold seeds
+    seed_everything(args.seed)
     # load model and tokenizer
     MODEL_NAME = args.model
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -125,9 +130,9 @@ def train(args):
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
     RE_valid_dataset = RE_Dataset(tokenized_valid, valid_label)
+    print("[dataset 예시]", tokenizer.decode(RE_train_dataset[data_idx]['input_ids']), sep='\n')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
     print(device)
     # setting model hyperparameter
     model_config = AutoConfig.from_pretrained(MODEL_NAME)
@@ -142,7 +147,7 @@ def train(args):
     ###############################################
     b_model = AutoModel.from_pretrained(MODEL_NAME, config= model_config)
     b_model.resize_token_embeddings(num_added_token + tokenizer.vocab_size)
-    model = TunedModelLSTM(b_model, 30, device)
+    model = TunedModelLSTM(b_model, 30, device, args.dropout)
 
     #print(model.config)
     model.to(device)
@@ -152,22 +157,23 @@ def train(args):
     valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
 
     optim = AdamW([
-        #{'params' : model.parameters(), 'lr':args.lr},
                     {'params' : model.base_model.parameters(), 'lr':args.lr},
                     {'params':model.linear.parameters(), 'lr':args.lr},
-                    {'params' : model.rnn.parameters(), 'lr' : 0.0001},
+                    {'params' : model.rnn.parameters(), 'lr' : 0.001},
                     {'params' : model.rnn_lin.parameters(), 'lr' : 0.001},
                     ])
 
     for param_group in optim.param_groups:
         print(param_group['lr'])
 
-    # optim = AdamW([{'params': model.BERT.parameters(), 'lr':args.lr}, 
-    #                 {'params':model.cls_classifier.parameters(), 'lr':args.lr},
-    #                 {'params':model.fc.parameters(), 'lr':args.lr},
-    #                 {'params': model.LSTM.parameters(), 'lr': 0.001}])
 
     criterion = create_criterion(args.criterion)
+    # scheduler: torch.optim
+    # if args.lr_scheduler == "StepLR":
+    #     scheduler = StepLR(optim, 20, gamma=0.5)
+    # elif args.lr_scheduler == "ReduceLROnPlateau":
+    #     scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
+
 
     save_path = args.save_dir
 
@@ -202,11 +208,21 @@ def train(args):
     best_eval_f1 = 0
     total_idx = 0
 
-
+    schedule_idx = 1
     for epoch in range(args.epochs):
         total_f1, total_loss, total_acc = 0, 0, 0
         average_loss, average_f1, average_acc = 0,0,0
         #model.train()
+
+        # LR scheduler
+        # if epoch > 1 and epoch % 2 == 0:
+        #     schedule_idx *= 2
+        #     optim = AdamW([
+        #             {'params' : model.base_model.parameters(), 'lr':args.lr / 2},
+        #             {'params':model.linear.parameters(), 'lr':args.lr / 2},
+        #             {'params' : model.rnn.parameters(), 'lr' : args.c_lr / 2},
+        #             {'params' : model.rnn_lin.parameters(), 'lr' : args.c_lr / 2},
+        #             ])
         
         for idx, batch in enumerate(tqdm(train_loader)):
             model.train()
@@ -217,7 +233,7 @@ def train(args):
             attention_mask = batch['attention_mask'].to(device)
             token_type_ids =  batch['token_type_ids'].to(device)
             labels = batch['labels'].to(device)
-            outputs = model(input_ids, attention_mask=attention_mask, labels=labels,token_type_ids=token_type_ids)
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
             pred = outputs[1]
             metric = compute_metrics(pred, labels)
 
@@ -303,14 +319,22 @@ def train(args):
                 "epoch":epoch+1,
                 "train_loss":average_loss,
                 "train_f1":average_f1,
-                "train_acc":average_acc
+                "train_acc":average_acc,
+                "learning_rate": optim.param_groups[0]['lr']
                 })
+        # if args.lr_scheduler == 'ReduceLROnPlateau':
+        #     scheduler.step(eval_average_loss)
+        #     print('LR:', optim.param_groups[0]['lr'])
+        # elif args.lr_scheduler == 'StepLR':
+        #     scheduler.step()
+        #     print('LR:', optim.param_groups[0]['lr'])
+
     
     if args.wandb == "True":
         wandb.finish()
 
+
 def main(args):
-    seed_everything(args.seed)
     train(args)
 
 if __name__ == '__main__':
@@ -327,6 +351,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
+    parser.add_argument('--c_lr', type=float, default=1e-3)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
