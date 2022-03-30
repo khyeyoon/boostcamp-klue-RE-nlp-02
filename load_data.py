@@ -186,7 +186,7 @@ class Preprocessing_dataset:
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':dataset['sentence'],'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
 
-def load_data(dataset_dir, token_type='origin'):
+def load_data(dataset_dir, token_type='origin', is_relation=False):
     """
     Arguments:
         dataset_dir (dataset path): dataset 파일 경로
@@ -198,7 +198,12 @@ def load_data(dataset_dir, token_type='origin'):
             - 'sub_obj' : subject와 object 각각 token 추가
             - 'special_entity' : @, #으로 token 추가
     """
-    pd_dataset = pd.read_csv(dataset_dir)
+    if is_relation:
+        pd_dataset = pd.read_csv(dataset_dir)
+        pd_dataset = pd_dataset[pd_dataset.label == 'no_relation']
+    else:
+        pd_dataset = pd.read_csv(dataset_dir)
+
     dataset = Preprocessing_dataset(pd_dataset,token_type).return_dataset()
     print(f"{token_type} preprocessing finished")
 
