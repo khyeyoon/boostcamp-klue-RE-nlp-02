@@ -104,14 +104,14 @@ def str_cf(cf):
     idx = 0
     result = "     "
     for i in range(30):
-        result += ("%-4d" %i)
+        result += ("%4d" %i)
     result += '\n    '
     result += ('----'*30 + '\n')
     for i in cf:
         result += ("%-3d| " % idx)
         idx += 1
         for j in i:
-            result += ("%-4d" % j)
+            result += ("%4d" % j)
         result += '\n'
     return result
 
