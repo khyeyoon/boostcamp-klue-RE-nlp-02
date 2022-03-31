@@ -94,6 +94,7 @@ def main(args):
         model_config_parameters = json.load(f)
         token_type = model_config_parameters['token_type']
         sep_type = model_config_parameters['sep_type']
+        kfold_splits = model_config_parameters['kfold_splits']
     #print(model_config_parameters)
     
     ## load test datset
@@ -105,7 +106,7 @@ def main(args):
     print("[dataset 예시]", tokenizer.decode(Re_test_dataset[data_idx]['input_ids']), sep='\n')
 
     probs = torch.zeros([7765, 30]).to(device)
-    for kfold_idx in range(5):
+    for kfold_idx in range(kfold_splits):
         model_path = os.path.join(args.model_dir, str(kfold_idx), 'best_loss')
         model = torch.load(os.path.join(model_path, 'model.bin'))
         model.to(device)
@@ -114,7 +115,7 @@ def main(args):
         prob_answer  = inference(model, Re_test_dataset, device) # model에서 class 추론
         probs += prob_answer
 
-    probs = probs/5
+    probs = probs/kfold_splits
     probs = F.softmax(probs, dim=-1).detach().cpu().numpy()
     preds = np.argmax(probs, axis=-1)
     probs = probs.tolist()

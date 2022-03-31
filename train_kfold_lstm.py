@@ -215,7 +215,8 @@ def train(args):
             "optimizer":args.optimizer,
             "lr":args.lr,
             "val_ratio":args.val_ratio,
-            "sep_type":args.sep_type
+            "sep_type":args.sep_type,
+            "kfold_splits":args.kfold_splits,
         }
 
         if not os.path.exists(save_path):
