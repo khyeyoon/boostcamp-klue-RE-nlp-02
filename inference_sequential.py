@@ -12,6 +12,13 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 
+def softmax(x):
+    max = np.max(x,axis=1,keepdims=True) #returns max of each row and keeps same dims
+    e_x = np.exp(x - max) #subtracts each row with its max value
+    sum = np.sum(e_x,axis=1,keepdims=True) #returns sum of each row and keeps same dims
+    f_x = e_x / sum 
+    return f_x
+
 def inference(model, tokenized_sent, device):
     """
     test dataset을 DataLoader로 만들어 준 후,
@@ -58,7 +65,9 @@ def inference_binary(model, tokenized_sent, device):
         logits = outputs[0]
         prob = [[1.] + [0.] * 29 for _ in range(logits.shape[0])] # F.softmax(logits, dim=-1).detach().cpu().numpy()
         logits = logits.detach().cpu().numpy()
-        result = np.argmax(logits, axis=-1)
+        logits = softmax(logits)
+        result = np.array((logits[:, 0]<0.6), dtype=int)
+        # result = np.argmax(logits, axis=-1)
 
         output_pred.append(result)
         output_prob.append(prob)

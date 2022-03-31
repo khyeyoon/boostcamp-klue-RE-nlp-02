@@ -24,12 +24,12 @@ class Preprocessing_dataset:
         self.dataset=dataset
         self.token_type=token_type
         self.dict_type_to_str = {
-            "PER":"person",
-            "ORG":"organization",
-            "POH":"position",
-            "LOC":"location",
-            "DAT":"date",
-            "NOH":"number"
+            "PER":"사람", #"person",
+            "ORG":"기관", #"organization",
+            "POH":"지위", #"position",
+            "LOC":"위치", #"location",
+            "DAT":"날짜", #"date",
+            "NOH":"숫자", #"number"
         }
         
     def return_dataset(self):        
@@ -161,14 +161,21 @@ class Preprocessing_dataset:
         for s, sub, obj in zip(dataset['sentence'], dataset['subject_entity'], dataset['object_entity']):
             sub_entity = sub[1:-1].split(',')[0].split(':')[1][2:-1]
             obj_entity = obj[1:-1].split(',')[0].split(':')[1][2:-1]
+            sub_s_idx, sub_e_idx = int(sub.split(",")[-3].split(":")[1]), int(sub.split(",")[-2].split(":")[1])
+            obj_s_idx, obj_e_idx = int(obj.split(",")[-3].split(":")[1]), int(obj.split(",")[-2].split(":")[1])
             sub_type = self.dict_type_to_str[sub[1:-1].split(',')[-1].split(':')[1].strip().replace("'", "")]
             obj_type = self.dict_type_to_str[obj[1:-1].split(',')[-1].split(':')[1].strip().replace("'", "")]
+            sub_replace_word = "ㅅ"*(sub_e_idx - sub_s_idx + 1)
+            obj_replace_word = "ㅇ"*(obj_e_idx - obj_s_idx + 1)
+            
+            s = s[:sub_s_idx] + sub_replace_word + s[sub_e_idx + 1:]
+            s = s[:obj_s_idx] + obj_replace_word + s[obj_e_idx + 1:]
 
-            s = re.sub(sub, ' @ * ' + sub_type + ' * ' + sub_entity + ' @ ', s)
-            s = re.sub(obj, ' # ^ ' + obj_type + ' ^ ' + obj_entity + ' # ', s)
+            s = re.sub(sub_replace_word, ' @ * ' + sub_type + ' * ' + sub_entity + ' @ ', s)
+            s = re.sub(obj_replace_word, ' # ^ ' + obj_type + ' ^ ' + obj_entity + ' # ', s)
 
-            subject_entity.append(sub)
-            object_entity.append(obj)
+            subject_entity.append(sub_entity)
+            object_entity.append(obj_entity)
             pre_sentence.append(s)
         out_dataset = pd.DataFrame({'id':dataset['id'], 'sentence':pre_sentence,'subject_entity':subject_entity,'object_entity':object_entity,'label':dataset['label'],})
         return out_dataset
