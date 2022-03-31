@@ -10,7 +10,14 @@ import pickle as pickle
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
+<<<<<<< Updated upstream
 from torch.optim import AdamW
+=======
+from torch.optim import AdamW, Adam, SGD
+# from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
+from loss import create_criterion
+from scheduler import create_lr_scheduler
+>>>>>>> Stashed changes
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from load_data import *
 
@@ -137,7 +144,20 @@ def train(args):
     train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
     valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = True)
 
-    optim = AdamW(model.parameters(), lr=args.lr)
+    if args.optimizer == 'AdamW':
+        optim = AdamW(model.parameters(), lr=args.lr)
+    elif args.optimizer == 'Adam':
+        optim = Adam(model.parameters(), lr=args.lr)
+    elif args.optimizer == 'SGD':
+        optim = SGD(model.parameters(), lr=args.lr)
+    else:
+        optim = AdamW(model.parameters(), lr=args.lr)
+
+    criterion = create_criterion(args.criterion)
+
+    if args.lr_scheduler:
+        lr_scheduler = create_lr_scheduler(args.lr_scheduler)
+        scheduler = lr_scheduler(optim)
 
     wandb.log({
         "model":args.model,
@@ -162,11 +182,17 @@ def train(args):
         total_f1, total_auprc, total_acc = 0, 0, 0
         eval_total_f1, eval_total_auprc, eval_total_acc = 0, 0, 0
 
-        if epoch > 1 and epoch % 2 == 0:
-            lr_num *= 2
-        optim = AdamW(model.parameters(), lr=args.lr / lr_num)
-
-        model.train()
+        # # LR scheduler
+        # if epoch >= 2:
+        #     if epoch % 4 == 0:
+        #         schedule_idx *= 2
+        #     optim = SGD(model.parameters(), lr=args.lr / schedule_idx)
+        #     # if args.optimizer == 'AdamW':
+        #     #     optim = AdamW(model.parameters(), lr=args.lr / schedule_idx)
+        #     # elif args.optimizer == 'Adam':
+        #     #     optim = Adam(model.parameters(), lr=args.lr / schedule_idx)
+        #     # elif args.optimizer == 'SGD':
+        #     #     optim = SGD(model.parameters(), lr=args.lr / schedule_idx)
         
         for idx, batch in enumerate(tqdm(train_loader)):
             total_idx += 1
@@ -269,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_step', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--valid_batch_size', type=int, default=64)
-    parser.add_argument('--optimizer', type=str, default="AdamW")
+    parser.add_argument('--optimizer', type=str, default="AdamW") # AdamW, Adam, SGD
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default=None)
