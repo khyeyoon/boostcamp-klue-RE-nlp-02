@@ -9,10 +9,12 @@ import pandas as pd
 from tqdm import tqdm
 import pickle as pickle
 from sklearn.model_selection import train_test_split
+from functools import partial
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 # from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
+from collate_fn import collate_fn
 from loss import create_criterion
 from scheduler import create_lr_scheduler
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer
@@ -101,7 +103,7 @@ def seed_everything(seed):
 
 def train(args):
     # get random number to choose example sentence
-    data_idx = random.randint(0, 100)
+    data_idx = random.randint(0, 32)
     # hold seeds
     seed_everything(args.seed)
     # load model and tokenizer
@@ -130,6 +132,7 @@ def train(args):
     # make dataset for pytorch.
     RE_train_dataset = RE_Dataset(tokenized_train, train_label)
     RE_valid_dataset = RE_Dataset(tokenized_valid, valid_label)
+    # print(RE_train_dataset[data_idx]['input_ids'])
     print("[dataset 예시]", tokenizer.decode(RE_train_dataset[data_idx]['input_ids']), sep='\n')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -145,19 +148,16 @@ def train(args):
     print(model.config)
     model.to(device)
     
-    train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
-    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
+    train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True, collate_fn=partial(collate_fn, sep_token_id=tokenizer.sep_token_id))
+    valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False, collate_fn=partial(collate_fn, sep_token_id=tokenizer.sep_token_id))
+    print("[첫째 batch]\n", tokenizer.decode(next(iter(train_loader))["input_ids"][data_idx]))
+    # print(next(iter(train_loader))["input_ids"])
 
     optim = AdamW(model.parameters(), lr=args.lr)
     criterion = create_criterion(args.criterion)
 
     if args.lr_scheduler:
-        lr_scheduler = create_lr_scheduler(args.lr_scheduler)
-        scheduler = lr_scheduler(optim)
-
-    #     scheduler = StepLR(optim, 20, gamma=0.5)
-    #     scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
-
+        scheduler = create_lr_scheduler(args.lr_scheduler, optimizer=optim, mode='min', patience=1, factor=0.5, verbose=True)
 
     save_path = args.save_dir
 
@@ -263,6 +263,9 @@ def train(args):
                     eval_total_auprc = eval_total_auprc/len(valid_loader)
                     eval_average_acc = eval_total_acc/len(valid_loader)
 
+                    if args.lr_scheduler:
+                        scheduler.step(eval_average_loss)
+
                     if args.checkpoint:
                         model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
 
@@ -279,24 +282,24 @@ def train(args):
                             "step":total_idx,
                             "eval_loss":eval_average_loss,
                             "eval_f1":eval_average_f1,
-                            "eval_acc":eval_average_acc
+                            "eval_acc":eval_average_acc,
+                            "learning_rate": optim.param_groups[0]['lr']
                             })
 
                     print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
                     print(f"micro_f1_score:{eval_average_f1:4.2f} | accuracy:{eval_average_acc:4.2f}]")
 
                 print("--------------------------------------------------------------------------")
+
         if args.wandb == "True":
             wandb.log({
                 "epoch":epoch+1,
                 "train_loss":average_loss,
                 "train_f1":average_f1,
                 "train_acc":average_acc,
-                "learning_rate": optim.param_groups[0]['lr']
                 })
         
-        if args.lr_scheduler:
-            scheduler.step()
+        
             # if args.lr_scheduler == 'ReduceLROnPlateau':
             #     scheduler.step(eval_average_loss)
             # elif args.lr_scheduler == 'StepLR':
@@ -314,13 +317,13 @@ if __name__ == '__main__':
     # wandb.login()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="klue/bert-base")
+    parser.add_argument('--model', type=str, default="klue/roberta-large")
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--epochs', type=int, default=3)
     parser.add_argument('--logging_step', type=int, default=100)
-    parser.add_argument('--eval_step', type=int, default=100)
+    parser.add_argument('--eval_step', type=int, default=40)
     parser.add_argument('--checkpoint', type=bool, default=False)
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
@@ -328,7 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
-    parser.add_argument('--project_name', type=str, default="salt_v2")
+    parser.add_argument('--project_name', type=str, default="salt_v3")
     parser.add_argument('--token_type', type=str, default="origin") # 'origin', 'entity', 'type_entity', 'sub_obj', 'special_entity'
     parser.add_argument('--wandb', type=str, default="True")
     parser.add_argument('--dropout', type=float, default=0.1)
