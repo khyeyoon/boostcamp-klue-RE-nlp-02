@@ -1,0 +1,14 @@
+/logs
+/best*
+/save*
+/.ipynb_checkpoints
+/__pycache__
+/prediction
+/result*
+/bests
+/wandb
+/tokenizer
+._*
+*.sh
+*.out
+test.ipynb
