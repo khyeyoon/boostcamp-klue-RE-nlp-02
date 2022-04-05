@@ -80,4 +80,3 @@ dict_num_to_label.pkl: Dict[int:str]
         Should be one of
         - 'SEP' : [CLS]이순신[SEP]무신[SEP]이순신은 조선 중기의 무신이다.
         - 'ENT' : [CLS][PER]이순신[/PER][POH]무신[/POH][SEP]이순신은 조선 중기의 무신이다.
-   <br>
