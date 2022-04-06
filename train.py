@@ -274,7 +274,10 @@ def train(args):
                     eval_average_acc = eval_total_acc/len(valid_loader)
 
                     if args.lr_scheduler:
-                        scheduler.step(eval_average_loss)
+                        if args.lr_scheduler == 'reduceLR':
+                            scheduler.step(eval_average_loss)
+                        elif args.lr_scheduler == 'StepLR':
+                            scheduler.step()  
 
                     if args.checkpoint:
                         model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
@@ -293,7 +296,8 @@ def train(args):
                             "eval_loss":eval_average_loss,
                             "eval_f1":eval_average_f1,
                             "eval_acc":eval_average_acc,
-                            "learning_rate": optim.param_groups[0]['lr']
+                            "learning_rate": optim.param_groups[0]['lr'],
+                            "lr": args.lr,
                             })
 
                     print(f"[EVAL][loss:{eval_average_loss:4.2f} | auprc:{eval_total_auprc:4.2f} | ", end="")
@@ -310,7 +314,7 @@ def train(args):
                 })
         
         
-            # if args.lr_scheduler == 'ReduceLROnPlateau':
+            # if args.lr_scheduler == 'reduceLR':
             #     scheduler.step(eval_average_loss)
             # elif args.lr_scheduler == 'StepLR':
             #     scheduler.step()
@@ -346,7 +350,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb', type=str, default="True")
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--sep_type', type=str, default='SEP') # SEP, ENT
-    parser.add_argument('--lr_scheduler', type=str) # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
+    parser.add_argument('--lr_scheduler', type=str, default='reduceLR') # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
     
     args = parser.parse_args()
     main(args)

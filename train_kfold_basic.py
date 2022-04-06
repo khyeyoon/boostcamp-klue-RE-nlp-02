@@ -9,16 +9,18 @@ import pandas as pd
 from tqdm import tqdm
 import pickle as pickle
 from sklearn.model_selection import train_test_split
+from functools import partial
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix, classification_report
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from adamp import AdamP
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
+from collate_fn import collate_fn
 from loss import create_criterion
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer, AutoModel
 from scheduler import create_lr_scheduler
 from load_data import *
-from tune_models import *
 
 import argparse
 import wandb
@@ -139,6 +141,9 @@ def train(args):
     dataset = load_data("../dataset/train/train.csv", token_type=args.token_type)
     dataset_label = label_to_num(dataset['label'].values)
 
+    # best_eval_loss = 1e9
+    # best_eval_f1 = 0
+    # total_idx = 0
     for kfold_idx, (train_idx, valid_idx) in enumerate(skf.split(dataset, dataset_label)):
         print(f'########  kfold : {kfold_idx} start  ########')
 
@@ -177,11 +182,16 @@ def train(args):
         # model.to(device)
         # ################################################
 
-    
-        train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True)
-        valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False)
+        
+        train_loader = DataLoader(RE_train_dataset, batch_size=args.batch_size, shuffle=True, drop_last = True, collate_fn=partial(collate_fn, sep_token_id=tokenizer.sep_token_id))
+        valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True, drop_last = False, collate_fn=partial(collate_fn, sep_token_id=tokenizer.sep_token_id))
 
-        optim = AdamW(model.parameters(), lr=args.lr)
+        if args.optimizer == 'AdamW':
+            optim = AdamW(model.parameters(), lr=args.lr)
+        elif args.optimizer == 'AdamP': # lr=0.001
+            optim = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-2)
+        else:
+            optim = AdamW(model.parameters(), lr=args.lr)
         # optim = AdamW([
         #                 {'params' : model.base_model.parameters(), 'lr':args.lr},
         #                 {'params':model.linear.parameters(), 'lr':args.lr},
@@ -196,12 +206,14 @@ def train(args):
         criterion = create_criterion(args.criterion)
 
         if args.lr_scheduler:
-            lr_scheduler = create_lr_scheduler(args.lr_scheduler)
-            scheduler = lr_scheduler(optim)
-
+            # lr_scheduler = create_lr_scheduler(args.lr_scheduler)
+            # scheduler = lr_scheduler(optim)
+            
         #     scheduler = StepLR(optim, 20, gamma=0.5)
-        #     scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
-
+            if args.lr_scheduler == 'reduceLR':
+                scheduler = ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=0, verbose=1)
+            elif args.lr_scheduler == 'StepLR':
+                scheduler = StepLR(optim, 20, gamma=0.5)
 
         save_path = args.save_dir
         k_save_path = os.path.join(save_path, str(kfold_idx))
@@ -241,22 +253,11 @@ def train(args):
         best_eval_loss = 1e9
         best_eval_f1 = 0
         total_idx = 0
-
-        schedule_idx = 1
+        
         for epoch in range(args.epochs):
             total_f1, total_loss, total_acc = 0, 0, 0
             average_loss, average_f1, average_acc = 0,0,0
             #model.train()
-
-            # LR scheduler
-            # if epoch > 1 and epoch % 2 == 0:
-            #     schedule_idx *= 2
-            #     optim = AdamW([
-            #             {'params' : model.base_model.parameters(), 'lr':args.lr / 2},
-            #             {'params':model.linear.parameters(), 'lr':args.lr / 2},
-            #             {'params' : model.rnn.parameters(), 'lr' : args.c_lr / 2},
-            #             {'params' : model.rnn_lin.parameters(), 'lr' : args.c_lr / 2},
-            #             ])
             
             for idx, batch in enumerate(tqdm(train_loader)):
                 model.train()
@@ -318,10 +319,10 @@ def train(args):
                             pred_list.extend(list(pred.detach().cpu().numpy().argmax(-1)))
                             label_list.extend(list(labels.detach().cpu().numpy()))
 
-                        eval_average_loss = eval_total_loss/len(valid_loader)
-                        eval_average_f1 = eval_total_f1/len(valid_loader)
-                        eval_total_auprc = eval_total_auprc/len(valid_loader)
-                        eval_average_acc = eval_total_acc/len(valid_loader)
+                        eval_average_loss = eval_total_loss / len(valid_loader)
+                        eval_average_f1 = eval_total_f1 / len(valid_loader)
+                        eval_total_auprc = eval_total_auprc / len(valid_loader)
+                        eval_average_acc = eval_total_acc / len(valid_loader)
 
                         cf = confusion_matrix(label_list, pred_list)
                         cf = str_cf(cf)
@@ -333,18 +334,18 @@ def train(args):
                             f.write('\n')
 
                         if args.checkpoint:
-                            model.save_pretrained(os.path.join(save_path, f"checkpoint-{total_idx}"))
+                            model.save_pretrained(os.path.join(k_save_path, f"checkpoint-{total_idx}"))
                             # os.makedirs( os.path.join(k_save_path, f"checkpoint-{total_idx}") , exist_ok=True)
                             # torch.save(model, os.path.join(k_save_path, f"checkpoint-{total_idx}", "model.bin"))
 
                         if eval_average_loss < best_eval_loss:
-                            model.save_pretrained(os.path.join(save_path, "best_loss"))
+                            model.save_pretrained(os.path.join(k_save_path, "best_loss"))
                             # os.makedirs( os.path.join(k_save_path, "best_loss") , exist_ok=True)
                             # torch.save(model, os.path.join(k_save_path, "best_loss", "model.bin"))
                             best_eval_loss = eval_average_loss
 
                         if eval_average_f1 > best_eval_f1:
-                            model.save_pretrained(os.path.join(save_path, "best_f1"))
+                            model.save_pretrained(os.path.join(k_save_path, "best_f1"))
                             # os.makedirs( os.path.join(k_save_path, "best_f1") , exist_ok=True)
                             # torch.save(model, os.path.join(k_save_path, "best_f1", "model.bin"))
                             best_eval_f1 = eval_average_f1
@@ -372,12 +373,12 @@ def train(args):
                     "learning_rate": optim.param_groups[0]['lr']
                     })
             
-            if args.lr_scheduler:
+            # if args.lr_scheduler:
+            #     scheduler.step(eval_average_loss)
+            if args.lr_scheduler == 'reduceLR':
+                scheduler.step(eval_average_loss)
+            elif args.lr_scheduler == 'StepLR':
                 scheduler.step()
-                # if args.lr_scheduler == 'ReduceLROnPlateau':
-                #     scheduler.step(eval_average_loss)
-                # elif args.lr_scheduler == 'StepLR':
-                #     scheduler.step()
 
         
         if args.wandb == "True":
@@ -391,7 +392,7 @@ if __name__ == '__main__':
     # wandb.login()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="klue/bert-base")
+    parser.add_argument('--model', type=str, default="klue/roberta-large")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--logging_step', type=int, default=100)
@@ -399,19 +400,19 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', type=bool, default=False)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--valid_batch_size', type=int, default=64)
-    parser.add_argument('--optimizer', type=str, default="AdamW")
+    parser.add_argument('--optimizer', type=str, default="AdamW") # 'AdamW', 'AdamP'
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--c_lr', type=float, default=1e-3)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
     parser.add_argument('--report_name', type=str)
-    parser.add_argument('--project_name', type=str, default="salt_v2")
-    parser.add_argument('--token_type', type=str, default="origin") # 'origin', 'entity', 'type_entity', 'sub_obj', 'special_entity'
+    parser.add_argument('--project_name', type=str, default="salt_v3")
+    parser.add_argument('--token_type', type=str, default="origin") # 'origin', 'entity', 'type_entity', 'sub_obj', 'special_entity', 'special_type_entity'
     parser.add_argument('--wandb', type=str, default="True")
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--sep_type', type=str, default='SEP') # SEP, ENT
-    parser.add_argument('--lr_scheduler', type=str) # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
+    parser.add_argument('--lr_scheduler', type=str, default='reduceLR') # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
     parser.add_argument('--lstm_layers', type=int, default=2)
     parser.add_argument('--kfold_splits', type=int, default=5)
     

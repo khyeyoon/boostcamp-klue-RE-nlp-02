@@ -1,24 +1,24 @@
 import json
 from gevent import config
-from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification, TrainingArguments, Trainer, AutoModel, ElectraTokenizer, ElectraForSequenceClassification, ElectraModel
 from torch.utils.data import DataLoader
-from load_data import *
-from tune_models import *
+from utils.load_data import *
 import pandas as pd
 import torch
 import torch.nn.functional as F
 
+from functools import partial
 import pickle as pickle
 import numpy as np
 import argparse
 from tqdm import tqdm
 
-def inference(model, tokenized_sent, device):
+def inference(model, tokenized_sent, device, tokenizer):
     """
     test dataset을 DataLoader로 만들어 준 후,
     batch_size로 나눠 model이 예측 합니다.
     """
-    dataloader = DataLoader(tokenized_sent, batch_size=64, shuffle=False)
+    dataloader = DataLoader(tokenized_sent, batch_size=64, shuffle=False, collate_fn=partial(collate_fn, sep=tokenizer.sep_token_id))
     model.eval()
     output_pred = []
     output_prob = []
@@ -32,16 +32,21 @@ def inference(model, tokenized_sent, device):
         logits = outputs[0]
         output_prob.append(logits)
 
+        # prob = F.softmax(logits, dim=-1).detach().cpu().numpy()
+        # logits = logits.detach().cpu().numpy()
+        # result = np.argmax(logits, axis=-1)
+
+        # output_prob.append(result)
     output_prob = torch.cat(output_prob, dim=0)
-    
     return output_prob
+
 
 def num_to_label(label):
     """
     숫자로 되어 있던 class를 원본 문자열 라벨로 변환 합니다.
     """
     origin_label = []
-    with open('dict_num_to_label.pkl', 'rb') as f:
+    with open('./utils/dict_num_to_label.pkl', 'rb') as f:
         dict_num_to_label = pickle.load(f)
     for v in label:
         origin_label.append(dict_num_to_label[v])
@@ -66,32 +71,24 @@ def main(args):
     if not os.path.exists("./prediction"):
         os.mkdir("./prediction")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    # load tokenizer
-    Tokenizer_NAME = os.path.join(args.model_dir)
-    # Tokenizer_NAME = "klue/bert-base"
-    tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
+    MODEL_NAME = args.model_dir
+
+
+    with open(os.path.join(MODEL_NAME, "model_config_parameters.json"), 'r') as f:
+        mcp = json.load(f)
+        token_type, sep_type, kfold_splits = mcp['token_type'], mcp['sep_type'], mcp['kfold_splits']
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        # model_case, use_lstm = mcp["model_case"], mcp["use_lstm"]
+
+    # load tokenizer
+    # if model_case == 'basic':
+    #     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    # elif model_case == 'electra':
+    #     tokenizer = ElectraTokenizer.from_pretrained(MODEL_NAME)
     print('tokenizer', tokenizer)
 
-    ## load my model
-    # MODEL_NAME = args.model_dir # model dir.
-    # # model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-    # # model.parameters
-    # # model.to(device)
-    # #############################################
-    # model = torch.load(os.path.join(MODEL_NAME,'model.bin'))
-    # model.to(device)
 
-
-    #print(model)
-
-    with open(os.path.join(args.model_dir, "model_config_parameters.json"), 'r') as f:
-        model_config_parameters = json.load(f)
-        token_type = model_config_parameters['token_type']
-        sep_type = model_config_parameters['sep_type']
-        kfold_splits = model_config_parameters['kfold_splits']
-    #print(model_config_parameters)
-    
     ## load test datset
     test_dataset_dir = "../dataset/test/test_data.csv"
     test_id, test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer, token_type, sep_type)
@@ -102,16 +99,22 @@ def main(args):
 
     probs = torch.zeros([7765, 30]).to(device)
     for kfold_idx in range(kfold_splits):
-        model_path = os.path.join(args.model_dir, str(kfold_idx), 'best_loss')
-        # model = torch.load(os.path.join(model_path, 'model.bin'))
+        model_path = os.path.join(args.model_dir, str(kfold_idx), args.select_model)
+        # if use_lstm:
+        #     model = torch.load(os.path.join(model_path, 'model.bin'))
+        # else:
+            # if model_case == 'basic':
         model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            # elif model_case == 'electra':
+            #     model = ElectraForSequenceClassification.from_pretrained(model_path)
+
         model.to(device)
         ## predict answer
 
-        prob_answer  = inference(model, Re_test_dataset, device) # model에서 class 추론
+        prob_answer  = inference(model, Re_test_dataset, device, tokenizer) # model에서 class 추론
         probs += prob_answer
 
-    probs = probs / kfold_splits
+    probs = probs/kfold_splits
     probs = F.softmax(probs, dim=-1).detach().cpu().numpy()
     preds = np.argmax(probs, axis=-1)
     probs = probs.tolist()
@@ -132,7 +135,8 @@ if __name__ == '__main__':
     # model dir
     parser.add_argument('--model_dir', type=str, default="./results/best_loss")
     parser.add_argument('--submission_name', type=str, default="submission")
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--batch_size', type=int, default=62)
+    parser.add_argument('--select_model', type=str, default='best_loss') # best_loss, best_fi
 
     args = parser.parse_args()
     print(args)
