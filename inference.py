@@ -76,7 +76,8 @@ def main(args):
         os.mkdir("./prediction")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # load tokenizer
-    Tokenizer_NAME = os.path.join(args.model_dir, "..")
+    Tokenizer_NAME = os.path.join(args.model_dir) # 여러 best_loss가 있을 때 사용
+    # Tokenizer_NAME = os.path.join(args.model_dir, '..') # 단일 best_loss에서 추출할 때 사용
     # Tokenizer_NAME = "klue/bert-base"
     tokenizer = AutoTokenizer.from_pretrained(Tokenizer_NAME)
 
