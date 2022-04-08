@@ -13,22 +13,25 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 
-def inference(model, tokenized_sent, device, tokenizer):
+def inference(model, tokenized_sent, device, tokenizer, model_type, batch_size):
     """
     test dataset을 DataLoader로 만들어 준 후,
     batch_size로 나눠 model이 예측 합니다.
     """
-    dataloader = DataLoader(tokenized_sent, batch_size=64, shuffle=False, collate_fn=partial(collate_fn, sep=tokenizer.sep_token_id))
+    dataloader = DataLoader(tokenized_sent, batch_size=batch_size, shuffle=False, collate_fn=partial(collate_fn, sep=tokenizer.sep_token_id))
     model.eval()
     output_pred = []
     output_prob = []
     for i, data in enumerate(tqdm(dataloader)):
+        input_ids=data['input_ids'].to(device)
+        attention_mask=data['attention_mask'].to(device)
+        token_type_ids=data['token_type_ids'].to(device)
         with torch.no_grad():
-            outputs = model(
-                    input_ids=data['input_ids'].to(device),
-                    attention_mask=data['attention_mask'].to(device),
-                    token_type_ids=data['token_type_ids'].to(device)
-                    )
+            if 'xlm' in model_type:
+                outputs = model(input_ids = input_ids, attention_mask=attention_mask)
+            else:
+                outputs = model(input_ids = input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+
         logits = outputs[0]
         output_prob.append(logits)
 
@@ -78,10 +81,10 @@ def main(args):
     with open(os.path.join(MODEL_NAME, "model_config_parameters.json"), 'r') as f:
         mcp = json.load(f)
         token_type, sep_type, kfold_splits = mcp['token_type'], mcp['sep_type'], mcp['kfold_splits']
-        model_case, use_lstm = mcp["model_case"], mcp["use_lstm"]
+        model_case, use_lstm, model_type = mcp["model_case"], mcp["use_lstm"], mcp['model']
 
     # load tokenizer
-    if model_case == 'basic':
+    if model_case == 'automodel':
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     elif model_case == 'electra':
         tokenizer = ElectraTokenizer.from_pretrained(MODEL_NAME)
@@ -102,7 +105,7 @@ def main(args):
         if use_lstm:
             model = torch.load(os.path.join(model_path, 'model.bin'))
         else:
-            if model_case == 'basic':
+            if model_case == 'automodel':
                 model = AutoModelForSequenceClassification.from_pretrained(model_path)
             elif model_case == 'electra':
                 model = ElectraForSequenceClassification.from_pretrained(model_path)
@@ -110,7 +113,7 @@ def main(args):
         model.to(device)
         ## predict answer
 
-        prob_answer  = inference(model, Re_test_dataset, device, tokenizer) # model에서 class 추론
+        prob_answer  = inference(model, Re_test_dataset, device, tokenizer, model_type, args.batch_size) # model에서 class 추론
         probs += prob_answer
 
     probs = probs/kfold_splits

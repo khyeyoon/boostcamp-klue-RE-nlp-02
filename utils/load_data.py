@@ -242,7 +242,7 @@ def tokenized_dataset(dataset, tokenizer, sep_type='SEP'):
         return_tensors="pt",
         padding=True,
         truncation=True,
-        max_length=256,
+        max_length=160,
         add_special_tokens=True,
         )
     

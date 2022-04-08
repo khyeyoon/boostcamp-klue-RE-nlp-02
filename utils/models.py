@@ -32,7 +32,7 @@ def load_tokenizer_and_model(model_args, device):
 
 
     if model_args['use_lstm']:
-        if model_case == 'basic':
+        if model_case == 'automodel':
             tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
             num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(token_type, [])})    
 
@@ -50,7 +50,7 @@ def load_tokenizer_and_model(model_args, device):
         model = TunedModelLSTM(b_model, b_model_output_dim, class_num, device, dropout, lstm_layers = model_args['lstm_layers'])
 
     else:
-        if model_case == 'basic':
+        if model_case == 'automodel':
             tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
             num_added_token = tokenizer.add_special_tokens({"additional_special_tokens":special_tokens.get(token_type, [])})    
 
@@ -75,23 +75,28 @@ def load_tokenizer_and_model(model_args, device):
 
 
 class TunedModelLSTM(nn.Module):
-    def __init__(self, base_model, b_model_output_dim, num_classes, device, dropout_ratio, lstm_layers , lstm_dim = 768):
+    def __init__(self, base_model, b_model_output_dim, num_classes, device, dropout_ratio, lstm_layers , lstm_dim = 512, bidirectional = True):
         super().__init__()
         self.base_model= base_model
         self.num_classes = num_classes
         self.lstm_dim = lstm_dim
         self.lstm_layers = lstm_layers
         self.device = device
+        self.b_model_output_dim=b_model_output_dim
+        self.bidirectional=bidirectional
 
-        self.linear = nn.Linear(b_model_output_dim, self.num_classes)
+
+        self.linear = nn.Linear(self.b_model_output_dim, self.num_classes)
         self.dropout_cls = nn.Dropout(dropout_ratio)
 
-        self.rnn = nn.LSTM(
-            input_size = b_model_output_dim, 
-            hidden_size = self.lstm_dim, 
-            num_layers = self.lstm_layers, 
-            batch_first = True)
-        self.rnn_lin = nn.Linear(self.lstm_dim, self. num_classes)
+        self.rnn = LSTM(self.device, self.b_model_output_dim, self.lstm_dim, self.lstm_layers, self.bidirectional)
+
+        # self.rnn = nn.LSTM(
+        #     input_size = self.b_model_output_dim, 
+        #     hidden_size = self.lstm_dim, 
+        #     num_layers = self.lstm_layers, 
+        #     batch_first = True)
+        self.rnn_lin = nn.Linear(self.lstm_dim*2 if self.bidirectional else self.lstm_dim, self. num_classes)
         self.dropout_lhs = nn.Dropout(dropout_ratio)
 
         #self.loss = loss
@@ -100,9 +105,10 @@ class TunedModelLSTM(nn.Module):
         outputs = self.base_model(input_ids, attention_mask, token_type_ids)
 
         lhs = outputs.last_hidden_state
-        h0 = torch.zeros(self.lstm_layers, lhs.size(0), self.lstm_dim).to(self.device) # 2, batch, dim
-        c0 = torch.zeros(self.lstm_layers, lhs.size(0), self.lstm_dim).to(self.device) 
-        rnn_out, (hn, cn) = self.rnn(lhs, (h0, c0))
+        # h0 = torch.zeros(self.lstm_layers, lhs.size(0), self.lstm_dim).to(self.device) # 2, batch, dim
+        # c0 = torch.zeros(self.lstm_layers, lhs.size(0), self.lstm_dim).to(self.device) 
+        # rnn_out, (hn, cn) = self.rnn(lhs, (h0, c0))
+        rnn_out, (hn, cn) = self.rnn(lhs)
         lhs_logits = self.rnn_lin(rnn_out[:,-1:]).view([-1, self.num_classes])
         lhs_logits = self.dropout_cls(lhs_logits)
         
@@ -118,14 +124,22 @@ class TunedModelLSTM(nn.Module):
             return [pred]
 
 
-# class LSTM(nn.Module):
-#     def __init__(input_size = 768, hidden_size = 768, num_layers = 2):
-#         self.lstm = nn.LSTM(
-#             input_size = in_dim,
-#             hidden_size = lstm_dim,
-#             num_layers = num_layers,
-#             batch_first = True,
-#         )
+class LSTM(nn.Module):
+    def __init__(self, device, input_size, hidden_size, num_layers = 2, bidirectional = True):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.h_c_layers = num_layers*2 if bidirectional else num_layers
+        self.device = device
+        
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
+                            bidirectional=bidirectional,
+                            batch_first=True)
 
-#     def __forward__():
-#         ...
+    def forward(self, x):
+        h0 = torch.zeros(self.h_c_layers, x.shape[0], self.hidden_size).to(self.device)
+        c0 = torch.zeros(self.h_c_layers, x.shape[0], self.hidden_size).to(self.device)
+        out, (h_, c_) = self.lstm(x, (h0,c0))
+        return out, (h_,c_)

@@ -119,13 +119,15 @@ def train(args):
         valid_loader = DataLoader(RE_valid_dataset, batch_size=args.valid_batch_size, shuffle=True,
                                  drop_last = False, collate_fn=partial(collate_fn, sep=tokenizer.sep_token_id))
 
-        optim = AdamW(model.parameters(), lr=args.lr)
-        # optim = AdamW([
-        #                 {'params' : model.base_model.parameters(), 'lr':args.lr},
-        #                 {'params':model.linear.parameters(), 'lr':args.lr},
-        #                 {'params' : model.rnn.parameters(), 'lr' : 0.001},
-        #                 {'params' : model.rnn_lin.parameters(), 'lr' : 0.001},
-        #                 ])
+        if not args.use_lstm:
+            optim = AdamW(model.parameters(), lr=args.lr)
+        else:
+            optim = AdamW([
+                            {'params' : model.base_model.parameters(), 'lr':args.lr},
+                            {'params':model.linear.parameters(), 'lr':args.c_lr},
+                            {'params' : model.rnn.parameters(), 'lr' : args.c_lr},
+                            {'params' : model.rnn_lin.parameters(), 'lr' :args.c_lr},
+                            ])
 
         # for param_group in optim.param_groups:
         #     print(param_group, param_group['lr'])
@@ -157,7 +159,10 @@ def train(args):
                 attention_mask = batch['attention_mask'].to(device)
                 token_type_ids =  batch['token_type_ids'].to(device)
                 labels = batch['labels'].to(device)
-                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
+                if 'xlm' in args.model:
+                    outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+                else:
+                    outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
                 pred = outputs[1]
                 metric = compute_metrics(pred, labels)
 
@@ -193,7 +198,10 @@ def train(args):
                             attention_mask = batch['attention_mask'].to(device)
                             token_type_ids =  batch['token_type_ids'].to(device)
                             labels = batch['labels'].to(device)
-                            outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
+                            if 'xlm' in args.model:
+                                outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+                            else:
+                                outputs = model(input_ids, attention_mask=attention_mask, labels=labels, token_type_ids=token_type_ids)
                             pred = outputs[1]
                             eval_metric = compute_metrics(pred, labels)
 
@@ -286,7 +294,7 @@ if __name__ == '__main__':
     # wandb.login()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="klue/bert-base")
+    parser.add_argument('--model', type=str, default="klue/bert-base") # klue/roberta-large, 
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--logging_step', type=int, default=100)
@@ -296,7 +304,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid_batch_size', type=int, default=64)
     parser.add_argument('--optimizer', type=str, default="AdamW")
     parser.add_argument('--lr', type=float, default=5e-5)
-    parser.add_argument('--c_lr', type=float, default=1e-3)
+    parser.add_argument('--c_lr', type=float, default=1e-4)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--criterion', type=str, default="cross_entropy") # 'cross_entropy', 'focal', 'label_smoothing', 'f1'
     parser.add_argument('--save_dir', type=str, default="./results")
@@ -309,7 +317,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_scheduler', type=str) # 'stepLR', 'reduceLR', 'cosine_anneal_warm', 'cosine_anneal', 'custom_cosine'
     parser.add_argument('--lstm_layers', type=int, default=2)
     parser.add_argument('--kfold_splits', type=int, default=5)
-    parser.add_argument('--model_case', type=str, default='basic') # basic, electra
+    parser.add_argument('--model_case', type=str, default='automodel') # automodel, electra
     parser.add_argument('--use_lstm', type=bool, default=False)
     parser.add_argument('--use_sub_obj', type=bool, default=False)
 
