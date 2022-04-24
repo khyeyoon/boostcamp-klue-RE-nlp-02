@@ -43,7 +43,7 @@ dict_num_to_label.pkl: Dict[int:str]
         
 2. Run
 
-        python src/train.py
+        python train.py
         
 3. [Option]
 ```
