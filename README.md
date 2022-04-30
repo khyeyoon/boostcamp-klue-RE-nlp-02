@@ -2,7 +2,7 @@
 
 본 대회에 대한 세부적인 내용은 아래 링크를 통해 확인하실 수 있습니다.
 
-https://plaid-raja-512.notion.site/RE-Wrap-Up-Report-7c91a7b4fd3f4917bf40e1be99cd2612
+https://guiltless-tiglon-d23.notion.site/RE-Wrap-Up-Report-3b196cec29f24da4bc813930be950d7c
 
 # Performance
 
